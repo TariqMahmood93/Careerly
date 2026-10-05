@@ -156,20 +156,47 @@
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* ignore */ }
   }
 
-  async function load() {
+  // Claude's daily hand-picked calls (data/suggestions.json) join the same list as "Claude picks"
+  function pickToPosition(x) {
+    return {
+      id: `pick-${x.id}`, pick: true, source: 'Claude daily pick', origin: x.source || '',
+      kind: x.type || '', type: x.type || '', title: x.title, titleAlt: '',
+      institution: [x.institution, x.pi].filter(Boolean).join(' · '),
+      country: x.country || '', city: x.city || '', deadline: x.deadline || '',
+      url: x.callUrl || x.applyUrl || '', applyUrl: x.applyUrl || '',
+      field: x.keywords || '', summary: x.procedure || '', why: x.why || '',
+      salary: x.salary || '', duration: x.duration || '',
+      score: 100 + (Number(x.matchScore) || 0), stars: Number(x.matchScore) || 0,
+      matched: [], relevant: true, firstSeen: x.foundOn || '', raw: x,
+    };
+  }
+
+  async function getJson(url) {
     try {
-      const res = await fetch(`${URL}?t=${Date.now()}`, { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      all = (data.positions || []).filter(p => !p.deadline || daysFromToday(p.deadline) >= 0);
-      meta = data;
-      $('#browse').hidden = false;
-      loadPersonal();
-      applyPersonal();
-      restoreControls();
-      renderMatchBar();
-      render();
-    } catch { /* no data yet, or opened as a local file */ }
+      const res = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store' });
+      return res.ok ? await res.json() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function load() {
+    const [data, picks] = await Promise.all([getJson(URL), getJson('data/suggestions.json')]);
+    if (!data && !picks) return; // no data yet, or opened as a local file
+    const open = p => !p.deadline || daysFromToday(p.deadline) >= 0;
+    const pickList = ((picks && picks.suggestions) || []).filter(x => x && x.id && x.title).map(pickToPosition).filter(open);
+    const pickUrls = new Set(pickList.map(p => p.url).filter(Boolean));
+    // a call found both ways is shown once, as the Claude pick (it has the "why it matches" note)
+    const collected = ((data && data.positions) || []).filter(open).filter(p => !pickUrls.has(p.url));
+    all = [...pickList, ...collected];
+    meta = { ...(data || {}), picksUpdatedAt: picks && picks.updatedAt };
+    if (meta.sources && pickList.length) meta.sources = { 'Claude daily picks': { ok: true, count: pickList.length }, ...meta.sources };
+    $('#browse').hidden = false;
+    loadPersonal();
+    applyPersonal();
+    restoreControls();
+    renderMatchBar();
+    render();
   }
 
   function restoreControls() {
@@ -233,7 +260,8 @@
     $('#br-summary').innerHTML =
       `<strong>${list.length}</strong> shown · ${all.length} open calls in total, ${relevantCount} match ${isPersonal() ? 'your CV' : 'the profile'}` +
       (newToday ? ` · <strong>${newToday} new today</strong>` : '') +
-      (meta.updatedAt ? ` · updated ${esc(new Date(meta.updatedAt).toLocaleString())}` : '');
+      (meta.updatedAt ? ` · updated ${esc(new Date(meta.updatedAt).toLocaleString())}` : '') +
+      (meta.picksUpdatedAt ? ` · Claude's last search ${esc(new Date(meta.picksUpdatedAt).toLocaleString())}` : '');
     const srcInfo = Object.entries(meta.sources || {})
       .map(([name, s]) => `${esc(name)}: ${s.ok === false ? '⚠️ failed, showing previous data' : (s.count ?? '?')}`).join(' · ');
     $('#br-sources').textContent = srcInfo ? `Sources — ${srcInfo}` : '';
@@ -243,20 +271,23 @@
       const loc = [p.city, p.country].filter(Boolean).join(', ');
       return `<article class="br-item">
         <div class="br-main">
-          <h3><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>
+          <h3>${p.pick ? '<span class="chip pick" title="Hand-picked by Claude\'s daily search for the site owner">⭐ Claude pick</span> ' : ''}<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>
             ${p.firstSeen === today ? '<span class="chip new">NEW</span>' : ''}</h3>
           ${p.titleAlt ? `<div class="muted br-alt">${esc(p.titleAlt)}</div>` : ''}
           <div class="inst">${esc(p.institution || '')}</div>
           <div class="meta">
             ${loc ? `<span class="chip">📍 ${esc(loc)}</span>` : ''}
             ${deadlineChip(p.deadline)}
-            <span class="chip">🔎 ${esc(p.source)}</span>
+            ${p.stars ? `<span class="chip" title="Match with the owner's profile">${'★'.repeat(Math.min(5, p.stars))}</span>` : ''}
+            <span class="chip">🔎 ${esc(p.pick ? (p.origin || 'Claude search') : p.source)}</span>
             ${p.kind || p.type ? `<span class="chip">${esc(p.kind || p.type)}</span>` : ''}
             ${hitsOf(p).slice(0, 4).map(m => `<span class="chip kw">${esc(m)}</span>`).join('')}
           </div>
+          ${p.why ? `<p class="why">💡 ${esc(p.why)}</p>` : ''}
           ${p.summary || p.field ? `<details><summary>Details</summary>
-            ${p.field ? `<p class="muted"><strong>Field:</strong> ${esc(p.field)}</p>` : ''}
-            ${p.summary ? `<p>${esc(p.summary)}</p>` : ''}
+            ${p.field ? `<p class="muted"><strong>${p.pick ? 'Topics' : 'Field'}:</strong> ${esc(p.field)}</p>` : ''}
+            ${p.summary ? `<p>${p.pick ? '<strong>How to apply:</strong> ' : ''}${esc(p.summary)}</p>` : ''}
+            ${p.raw && p.raw.applyEmail ? `<p><strong>Apply by email:</strong> <a href="mailto:${esc(p.raw.applyEmail)}">${esc(p.raw.applyEmail)}</a></p>` : ''}
             ${p.salary ? `<p class="muted"><strong>Salary:</strong> ${esc(p.salary)}</p>` : ''}
             ${p.duration ? `<p class="muted"><strong>Duration / contract:</strong> ${esc(p.duration)}</p>` : ''}
             ${p.applyUrl ? `<p><a href="${esc(p.applyUrl)}" target="_blank" rel="noopener">Call / application page ↗</a></p>` : ''}
@@ -275,6 +306,7 @@
   function add(id) {
     const p = all.find(x => x.id === id);
     if (!p) return;
+    if (p.pick) { C.add({ ...p.raw, source: p.origin || 'Claude daily pick' }, { sourceId: p.id, suggestionId: p.raw.id }); return; }
     C.add({
       title: p.title, type: p.type, institution: p.institution, country: p.country, city: p.city,
       callUrl: p.url, deadline: p.deadline, salary: p.salary, duration: p.duration,

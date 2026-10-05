@@ -37,8 +37,9 @@ The EURAXESS and jobs.ac.uk listings currently focus on computer science, data, 
 
 Every morning (06:00, Rome time) a scheduled Claude task searches the web for new postdoc and researcher
 calls that match the profile in [`data/profile.md`](data/profile.md). It checks **Bandi MUR** (Italy), **EURAXESS** (other EU countries), **jobs.ac.uk** and Irish research centres and universities (UK and Ireland), plus Switzerland and Norway. The full catalogue of about 120 job boards, institutes and fellowship programmes is in [`data/SOURCES.md`](data/SOURCES.md). It covers ★ sources daily and rotates through the others by weekday. It adds them to
-[`data/suggestions.json`](data/suggestions.json) on `main`. When you open the app, they appear at the top under
-**New positions found for you**, where you can **+ Add to tracker** or **Dismiss** each one.
+[`data/suggestions.json`](data/suggestions.json) on `main`. In the app they appear in **All open positions**
+marked **⭐ Claude pick**, with a short note on why each one matches. Pick *Claude daily pick* in the source filter to
+see only those. Use **+ Track** to add one to your applications.
 
 - Click **👤 My profile & CV** in the app to upload your CV (PDF) and edit what it looks for. They're saved as
   [`data/cv.md`](data/cv.md) and [`data/profile.md`](data/profile.md), which anyone can view. To save, paste a

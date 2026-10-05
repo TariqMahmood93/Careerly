@@ -7,9 +7,6 @@
 
   const STORAGE_KEY = 'careerly.positions.v1';
   const META_KEY = 'careerly.meta.v1';
-  const DISMISSED_KEY = 'careerly.dismissed.v1';
-  const SUGGESTIONS_URL = 'data/suggestions.json';
-  const SUGG_COUNTRY_KEY = 'careerly.suggCountry.v1';
   const DAY = 24 * 60 * 60 * 1000;
   const NO_RESPONSE_DAYS = 60;
   const DEADLINE_WARN_DAYS = 7;
@@ -60,9 +57,6 @@
   // ---------- State ----------
   let positions = load(STORAGE_KEY, []);
   let meta = load(META_KEY, { lastExport: null });
-  let dismissed = new Set(load(DISMISSED_KEY, []));
-  let suggestions = [];
-  let suggestionsUpdated = null;
   let editingId = null;
   let formDocs = [];
 
@@ -299,83 +293,6 @@
     sel.value = used.includes(cur) ? cur : '';
   }
 
-  // ---------- Daily suggestions (filled by the scheduled Claude search) ----------
-  async function loadSuggestions() {
-    try {
-      const res = await fetch(`${SUGGESTIONS_URL}?t=${Date.now()}`, { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      suggestions = Array.isArray(data.suggestions) ? data.suggestions.filter(x => x && x.id && x.title) : [];
-      suggestionsUpdated = data.updatedAt || null;
-      renderSuggestions();
-    } catch {
-      // Opened as a local file or no data yet: the inbox simply stays hidden.
-    }
-  }
-
-  function pendingSuggestions() {
-    const added = new Set(positions.map(p => p.suggestionId).filter(Boolean));
-    const addedUrls = new Set(positions.map(p => p.callUrl).filter(Boolean));
-    return suggestions
-      .filter(x => !dismissed.has(x.id) && !added.has(x.id) && !(x.callUrl && addedUrls.has(x.callUrl)))
-      .filter(x => !x.deadline || daysFromToday(x.deadline) >= 0)
-      .sort((a, b) => (b.foundOn || '').localeCompare(a.foundOn || '') ||
-        (b.matchScore || 0) - (a.matchScore || 0));
-  }
-
-  function renderSuggestions() {
-    const box = $('#suggestions');
-    if (!suggestions.length) { box.hidden = true; return; }
-    box.hidden = false;
-    const all = pendingSuggestions();
-
-    // Country dropdown: only countries with open positions, busiest first
-    const counts = {};
-    all.forEach(x => { const c = x.country || 'Other'; counts[c] = (counts[c] || 0) + 1; });
-    const countries = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
-    const sel = $('#sugg-country');
-    let chosen = sel.value || loadText(SUGG_COUNTRY_KEY);
-    if (chosen && !counts[chosen]) chosen = '';
-    sel.innerHTML = `<option value="">🌍 All countries (${all.length})</option>` +
-      countries.map(c => `<option value="${esc(c)}">${esc(c)} (${counts[c]})</option>`).join('');
-    sel.value = chosen;
-    const list = chosen ? all.filter(x => (x.country || 'Other') === chosen) : all;
-
-    const today = todayISO();
-    const newToday = list.filter(x => x.foundOn === today).length;
-    $('#sugg-summary').innerHTML =
-      `${list.length} to review${chosen ? ` in ${esc(chosen)}` : ''}${newToday ? ` · <strong>${newToday} new today</strong>` : ''}` +
-      (suggestionsUpdated ? ` · last search ${esc(new Date(suggestionsUpdated).toLocaleString())}` : '');
-    $('#sugg-list').innerHTML = list.length ? list.map(x => {
-      const loc = [x.city, x.country].filter(Boolean).join(', ');
-      const stars = x.matchScore ? '★'.repeat(Math.max(1, Math.min(5, x.matchScore))) : '';
-      return `<article class="sugg" data-sid="${esc(x.id)}">
-        <div class="card-top">
-          <div>
-            <h3>${esc(x.title)}</h3>
-            <div class="inst">${esc(x.institution || '')}${x.pi ? ' · ' + esc(x.pi) : ''}</div>
-          </div>
-          ${x.foundOn === today ? '<span class="chip new">NEW</span>' : ''}
-        </div>
-        <div class="meta">
-          ${stars ? `<span class="chip" title="Match with your profile">${stars}</span>` : ''}
-          ${loc ? `<span class="chip">📍 ${esc(loc)}</span>` : ''}
-          ${x.type ? `<span class="chip">${esc(x.type)}</span>` : ''}
-          ${x.source ? `<span class="chip" title="Where it was found">🔎 ${esc(x.source)}</span>` : ''}
-          ${x.deadline ? deadlineChip({ deadline: x.deadline, status: 'saved' }) : '<span class="chip">⏰ deadline not stated</span>'}
-        </div>
-        ${x.why ? `<p class="why">${esc(x.why)}</p>` : ''}
-        <div class="sugg-foot">
-          ${safeUrl(x.callUrl) ? `<a href="${esc(x.callUrl)}" target="_blank" rel="noopener">Open the call ↗</a>` : '<span></span>'}
-          <span class="spacer"></span>
-          <button class="btn small" data-dismiss="${esc(x.id)}">Dismiss</button>
-          <button class="btn small primary" data-accept="${esc(x.id)}">+ Add to tracker</button>
-        </div>
-      </article>`;
-    }).join('') : `<p class="empty">${chosen ? `No open positions in ${esc(chosen)} right now.` : 'All caught up — nothing new to review.'}</p>`;
-    $('#btn-restore-dismissed').hidden = dismissed.size === 0;
-  }
-
   // Copy an outside record (daily suggestion or collected position) into the tracker
   function addToTracker(x, extra = {}) {
     const now = Date.now();
@@ -399,10 +316,7 @@
     return p;
   }
 
-  function acceptSuggestion(id) {
-    const x = suggestions.find(s => s.id === id);
-    if (x) addToTracker(x, { suggestionId: x.id });
-  }
+
 
   // Small API for positions.js (the "All open positions" browser)
   const listeners = [];
@@ -418,7 +332,6 @@
 
   function render() {
     listeners.forEach(fn => { try { fn(); } catch { /* ignore */ } });
-    renderSuggestions();
     renderCountryFilter();
     renderStats();
     renderAlerts();
@@ -723,33 +636,6 @@
     }
   });
 
-  $('#sugg-list').addEventListener('click', e => {
-    const acc = e.target.dataset.accept, dis = e.target.dataset.dismiss;
-    if (acc) acceptSuggestion(acc);
-    if (dis) {
-      dismissed.add(dis);
-      localStorage.setItem(DISMISSED_KEY, JSON.stringify([...dismissed]));
-      renderSuggestions();
-    }
-  });
-  $('#btn-restore-dismissed').addEventListener('click', () => {
-    dismissed = new Set();
-    localStorage.setItem(DISMISSED_KEY, '[]');
-    renderSuggestions();
-  });
-  $('#sugg-country').addEventListener('change', e => {
-    try { localStorage.setItem(SUGG_COUNTRY_KEY, e.target.value); } catch { /* ignore */ }
-    const list = $('#sugg-list');
-    list.hidden = false;
-    $('#btn-toggle-sugg').textContent = 'Hide';
-    renderSuggestions();
-  });
-  $('#btn-toggle-sugg').addEventListener('click', () => {
-    const list = $('#sugg-list');
-    list.hidden = !list.hidden;
-    $('#btn-toggle-sugg').textContent = list.hidden ? 'Show' : 'Hide';
-  });
-
   // ---------- Init ----------
   fillSelect(form.elements.type, TYPES);
   fillSelect(form.elements.country, COUNTRIES, { blank: '— select —' });
@@ -758,5 +644,4 @@
   fillSelect($('#filter-type'), TYPES, { blank: 'All position types' });
   $('#btn-new').addEventListener('click', () => openForm(null));
   render();
-  loadSuggestions();
 })();
