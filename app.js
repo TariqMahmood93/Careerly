@@ -180,6 +180,16 @@
     return d ? d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
   }
 
+  // JSON with sorted keys: the account database (Postgres jsonb) does not keep key order,
+  // so plain JSON.stringify would see every synced copy as "changed"
+  function stableJSON(v) {
+    if (Array.isArray(v)) return `[${v.map(stableJSON).join(',')}]`;
+    if (v && typeof v === 'object') {
+      return `{${Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => `${JSON.stringify(k)}:${stableJSON(v[k])}`).join(',')}}`;
+    }
+    return JSON.stringify(v ?? null);
+  }
+
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
@@ -355,6 +365,9 @@
 
   // Copy an outside record (daily suggestion or collected position) into the tracker
   function addToTracker(x, extra = {}) {
+    // never add the same call twice (e.g. a double click, or two devices)
+    const existing = positions.find(p => (extra.sourceId && p.sourceId === extra.sourceId) || (x.callUrl && p.callUrl === x.callUrl));
+    if (existing) { toast('Already in your tracker'); render(); return existing; }
     const now = Date.now();
     const fields = ['title', 'type', 'reference', 'institution', 'group', 'pi', 'keywords', 'country',
       'city', 'callUrl', 'deadline', 'deadlineTime', 'deadlineTz', 'startDate', 'duration', 'salary', 'method', 'applyEmail',
@@ -412,7 +425,7 @@
       if ($('#detail-dialog').open && detailId === id) openDetail(id);
     },
     onDetail: fn => detailListeners.push(fn),
-    esc, fmtDate, daysFromToday, todayISO, deadlineAt, isExpired, fmtDeadline, timeLeft, validTime, tzOf,
+    esc, fmtDate, daysFromToday, todayISO, stableJSON, deadlineAt, isExpired, fmtDeadline, timeLeft, validTime, tzOf,
   };
   const detailListeners = [];
 

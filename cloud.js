@@ -70,9 +70,10 @@
     } finally {
       syncing = false;
     }
+    const same = C.stableJSON;
     const changedRemote = !data
-      || JSON.stringify(merged.positions) !== JSON.stringify(data.positions || [])
-      || JSON.stringify(personal) !== JSON.stringify(data.personal || null);
+      || same(merged.positions) !== same(data.positions || [])
+      || same(personal) !== same(data.personal || null);
     if (changedRemote) await push();
     else setSyncState('✓ Synced');
   }

@@ -337,9 +337,16 @@
     $('#br-more').textContent = `Show more (${list.length - shown} more)`;
   }
 
-  function add(id) {
+  function add(id, btn) {
     const p = all.find(x => x.id === id);
     if (!p) return;
+    if (C.isExpired(p)) {
+      C.toast('This call has just closed, so it was not added.');
+      all = all.filter(x => x !== p);
+      render();
+      return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = '✓ Added'; } // instant feedback, even before the list redraws
     if (p.pick) {
       C.add({ ...p.raw, source: p.origin || 'Claude daily pick', deadline: p.deadline, deadlineTime: p.deadlineTime,
         deadlineTz: p.deadlineTz, applyUrl: p.raw.applyUrl || p.applyUrl,
@@ -367,8 +374,8 @@
   $('#br-search').addEventListener('input', e => { prefs.q = e.target.value; rerender(); });
   $('#br-more').addEventListener('click', () => { shown += PAGE; render(); });
   $('#br-list').addEventListener('click', e => {
-    const id = e.target.dataset.add;
-    if (id) add(id);
+    const btn = e.target.closest('[data-add]');
+    if (btn && !btn.disabled) add(btn.dataset.add, btn);
   });
   $('#br-toggle').addEventListener('click', () => {
     const body = $('#br-body');
@@ -377,12 +384,13 @@
   });
   C.onChange(() => { if (all.length) render(); });
 
-  function setPersonal(next, msg, { silent = false } = {}) {
+  function setPersonal(next, msg, { silent = false, keepView = false } = {}) {
     personal = next;
     savePersonal({ silent });
     applyPersonal();
-    if (isPersonal() && prefs.sort === 'deadline') { prefs.sort = 'match'; $('#br-sort').value = 'match'; }
     renderMatchBar();
+    if (keepView) { render(); return; } // a sync from the account: don't re-sort or collapse the list
+    if (isPersonal() && prefs.sort === 'deadline') { prefs.sort = 'match'; $('#br-sort').value = 'match'; }
     rerender();
     if (msg) $('#match-status').textContent = msg;
   }
@@ -391,8 +399,8 @@
   window.CareerlyMatch = {
     get: () => personal,
     set: next => {
-      if (JSON.stringify(next || null) === JSON.stringify(personal || null)) return; // unchanged: keep the view as it is
-      if (all.length) setPersonal(next, '', { silent: true });
+      if (C.stableJSON(next || null) === C.stableJSON(personal || null)) return; // unchanged: keep the view as it is
+      if (all.length) setPersonal(next, '', { silent: true, keepView: true });
       else { personal = next; savePersonal({ silent: true }); }
     },
     onChange: fn => personalListeners.push(fn),
