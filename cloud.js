@@ -16,7 +16,12 @@
   const M = () => window.CareerlyMatch;
   const dlg = $('#account-dialog');
 
-  if (!window.supabase || !C) return; // library failed to load: the site keeps working locally
+  if (!window.supabase || !C) {
+    document.body.classList.remove('auth-checking');
+    const st = $('#auth-status');
+    if (st) { st.textContent = 'Could not load the login service. Please check your connection and reload the page.'; st.className = 'profile-status error'; }
+    return;
+  }
 
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
@@ -109,7 +114,7 @@
   }
 
   function setStatus(msg, kind = '') {
-    const el = $('#account-status');
+    const el = user ? $('#account-status') : $('#auth-status');
     el.textContent = msg;
     el.className = 'profile-status ' + kind;
   }
@@ -123,7 +128,7 @@
       btn.textContent = '🔐 Log in';
       btn.title = 'Log in to see your tracker and matches on any device';
     }
-    $('#account-out').hidden = !!user;
+    document.body.classList.toggle('locked', !user);
     $('#account-in').hidden = !user;
     if (user) $('#account-email').textContent = user.email;
   }
@@ -150,14 +155,13 @@
   }
 
   $('#btn-account').addEventListener('click', () => {
+    if (!user) return;
     setStatus('');
-    $('#account-password').value = '';
     dlg.showModal();
-    if (!user) $('#account-email-input').focus();
   });
 
   async function withBusy(fn) {
-    const btns = dlg.querySelectorAll('button');
+    const btns = document.querySelectorAll('#account-dialog button, #auth-screen button');
     btns.forEach(b => { b.disabled = true; });
     try { await fn(); } finally { btns.forEach(b => { b.disabled = false; }); }
   }
@@ -181,7 +185,8 @@
         : error.message === 'Invalid login credentials' ? 'Wrong email or password.' : error.message, 'error');
       return;
     }
-    dlg.close();
+    if (dlg.open) dlg.close();
+    $('#account-password').value = '';
     await onSignedIn(data.user, { fresh: true });
   }));
 
@@ -194,7 +199,7 @@
     const { data, error } = await sb.auth.signUp({ ...c, options: { emailRedirectTo: redirect } });
     if (error) { setStatus(error.message, 'error'); return; }
     if (data.session) {
-      dlg.close();
+      $('#account-password').value = '';
       await onSignedIn(data.user, { fresh: true });
     } else {
       setStatus(`Almost done! We sent a confirmation link to ${c.email}. Open it, then come back and log in.`, 'ok');
@@ -231,15 +236,23 @@
   // ---------- session ----------
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') onSignedOut();
-    if (event === 'PASSWORD_RECOVERY') {
-      dlg.showModal();
-      setStatus('Choose a new password below.', 'ok');
+    if (event === 'PASSWORD_RECOVERY' && session) {
+      onSignedIn(session.user).then(() => {
+        dlg.showModal();
+        setStatus('Choose a new password below.', 'ok');
+      });
     }
     if (event === 'TOKEN_REFRESHED' && session) user = session.user;
   });
 
   renderHeader();
   sb.auth.getSession().then(({ data }) => {
+    document.body.classList.remove('auth-checking');
     if (data.session && data.session.user) onSignedIn(data.session.user);
-  });
+    else $('#account-email-input').focus();
+  }).catch(() => document.body.classList.remove('auth-checking'));
+  // Enter key submits the login form
+  ['#account-email-input', '#account-password'].forEach(sel => $(sel).addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); $('#account-login').click(); }
+  }));
 })();
