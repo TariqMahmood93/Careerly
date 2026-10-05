@@ -152,6 +152,21 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; }
 #br-more { margin: 10px auto 0; display: block; }
 #br-more[hidden] { display: none; }
 
+/* Personal CV matching */
+.match-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px;
+  padding: 10px 12px; border-radius: var(--radius); background: color-mix(in srgb, var(--primary) 8%, transparent); }
+.match-mode { flex: 1 1 280px; font-size: 14px; }
+.match-bar .btn { display: inline-block; }
+.match-terms { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; font-size: 13px; }
+.match-terms[hidden] { display: none; }
+#match-chips { display: contents; }
+.chip.term { display: inline-flex; align-items: center; gap: 4px; background: var(--surface-2); }
+.chip.term.custom { outline: 1px solid var(--primary); }
+.chip.term button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 11px; }
+.match-add { width: 200px; padding: 3px 8px; font-size: 13px; }
+.match-status { margin: 6px 0 0; font-size: 13px; min-height: 0; }
+.match-status:empty { display: none; }
+
 /* ---------- Stats ---------- */
 .stats {
   display: grid;
@@ -300,3 +315,5 @@ code { background: var(--surface-2); padding: 0 4px; border-radius: 4px; }
   .kv { grid-template-columns: 1fr; }
   .kv dt { margin-top: 6px; }
 }
+
+.owner-note { margin: 2px 0 0; font-size: 12px; }

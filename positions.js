@@ -2,6 +2,10 @@
  * Shows every open call collected daily from Bandi MUR, EURAXESS and jobs.ac.uk
  * (data/positions.json, built by scripts/fetch_positions.py in GitHub Actions),
  * with filters for country, source, type and relevance to the profile.
+ *
+ * Personal matching: any visitor can upload their own CV. Its text is read in the browser,
+ * turned into weighted topic terms (rarer terms count more), and every position is re-scored
+ * against them. The CV and terms are kept only in this browser's storage, never uploaded.
  */
 (() => {
   'use strict';
@@ -16,6 +20,133 @@
   let all = [];
   let meta = {};
   let shown = PAGE;
+  const PERSONAL_KEY = 'careerly.personalMatch.v1';
+  let personal = null; // { name, terms: [{ t, w, custom? }], savedAt }
+
+  // ---------- personal matching ----------
+  const STOP = new Set(`a about above after again all also am an and any are as at be because been before being below
+    between both but by can could did do does doing down during each few for from further had has have having he her
+    here hers him his how i if in into is it its itself just me more most my no nor not now of off on once only or other
+    our out over own same she should so some such than that the their them then there these they this those through to
+    too under until up very was we were what when where which while who whom why will with would you your
+    via per etc using used based new within across including include includes towards toward well e.g i.e
+    il lo la i gli le un una uno di da del della dei degli delle al alla ai agli alle dal dalla nel nella nei nelle sul
+    sulla con per tra fra che non come anche piu sono essere stato ed o se su ad questo questa
+    university universita universite department dipartimento faculty school institute istituto centre center lab
+    laboratory group research ricerca researcher researchers phd dottorato doctoral postdoc postdoctoral post doc
+    professor prof dr assistant associate fellow fellowship position positions project projects work working year years
+    month months email phone tel mobile address italy pakistan january february march april may june july august
+    september october november december present current cv curriculum vitae page pages vol pp doi http https www com org
+    pdf grade supervisor co supervisor thesis master msc bsc mphil degree degrees bachelor student students course
+    courses member editor reviewer review journal journals conference conferences proceedings workshop workshops
+    paper papers international national european europe skills languages language english native professional
+    references reference declaration hereby information true correct knowledge belief personal data
+    big small novel approach approaches method methods analysis development design system systems model models tool tools
+    application applications technique techniques experience expertise industry company based study studies topic topics
+    activity activities team teams level high low good excellent strong main key general specific various several
+    app apps internet things introduction extended grant grants award awards abstract abstracts pre aware dynamic
+    accuracy incomplete free available anyone without own non one two three first second third free freely open
+    title titles volume issue under preparation submitted accepted stage experimental experiments seminar seminars
+    certificate certificates certification certifications coursework training`.split(/\s+/));
+
+  function norm(str) {
+    return ' ' + (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9+#]+/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
+  }
+
+  function cvCandidates(text) {
+    const words = norm(text).trim().split(' ');
+    const tf = new Map();
+    const bump = t => tf.set(t, (tf.get(t) || 0) + 1);
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      const ok = w.length >= 3 && !STOP.has(w) && !/^\d+$/.test(w);
+      if (ok) bump(w);
+      const n = words[i + 1];
+      if (ok && n && n.length >= 2 && !STOP.has(n) && !/^\d+$/.test(n)) bump(`${w} ${n}`);
+    }
+    return tf;
+  }
+
+  function posText(p) {
+    if (!p._norm) {
+      p._norm = norm([p.title, p.titleAlt, p.field, p.summary, p.kind, (p.matched || []).join(' ')].join(' '));
+    }
+    return p._norm;
+  }
+
+  function buildTerms(text) {
+    const tf = cvCandidates(text);
+    const N = all.length || 1;
+    const scored = [];
+    for (const [t, n] of tf) {
+      let df = 0;
+      const needle = ` ${t} `;
+      for (const p of all) if (posText(p).includes(needle)) df++;
+      if (df === 0 || df > N * 0.2) continue; // never appears, or too common to be useful
+      const bigram = t.includes(' ');
+      if (!bigram && n < 2 && t.length < 6) continue; // one-off short words are noise
+      const w = (1 + Math.log(n)) * Math.log(N / df) * (bigram ? 1.4 : 1);
+      scored.push({ t, w: Math.round(w * 100) / 100 });
+    }
+    scored.sort((a, b) => b.w - a.w);
+    // drop single words already covered by a stronger phrase containing them
+    const out = [];
+    for (const x of scored) {
+      if (!x.t.includes(' ') && out.some(y => y.t.includes(' ') && y.t.split(' ').includes(x.t) && y.w >= x.w)) continue;
+      out.push(x);
+      if (out.length >= 40) break;
+    }
+    return out;
+  }
+
+  function applyPersonal() {
+    for (const p of all) { delete p._ps; delete p._prel; delete p._phits; }
+    if (!personal || !personal.terms.length) return;
+    let max = 0;
+    for (const p of all) {
+      const txt = posText(p);
+      let sc = 0;
+      const hits = [];
+      for (const { t, w } of personal.terms) {
+        if (txt.includes(` ${norm(t).trim()} `)) { sc += w; hits.push(t); }
+      }
+      p._ps = Math.round(sc * 10) / 10;
+      p._phits = hits;
+      if (sc > max) max = sc;
+    }
+    for (const p of all) p._prel = p._phits.length >= 2 && p._ps >= max * 0.2;
+  }
+
+  const isPersonal = () => !!(personal && personal.terms.length);
+  const relOf = p => (isPersonal() ? p._prel : p.relevant);
+  const scoreOf = p => (isPersonal() ? p._ps : p.score);
+  const hitsOf = p => (isPersonal() ? p._phits : p.matched) || [];
+
+  function loadPersonal() {
+    try { personal = JSON.parse(localStorage.getItem(PERSONAL_KEY) || 'null'); } catch { personal = null; }
+  }
+  function savePersonal() {
+    try {
+      if (personal) localStorage.setItem(PERSONAL_KEY, JSON.stringify(personal));
+      else localStorage.removeItem(PERSONAL_KEY);
+    } catch { /* storage unavailable: matching still works for this visit */ }
+  }
+
+  function renderMatchBar() {
+    const on = isPersonal();
+    $('#match-mode').innerHTML = on
+      ? `🎯 Ranked for <strong>your CV</strong>${personal.name ? ` (${esc(personal.name)})` : ''}. It's stored only in this browser.`
+      : '🎯 Ranked for the site owner\'s research profile. <strong>Upload your CV</strong> to rank positions for you. It stays in your browser.';
+    $('#match-upload-label').firstChild.textContent = on ? '📄 Replace CV ' : '📄 Match to my CV ';
+    $('#match-clear').hidden = !on;
+    $('#match-terms').hidden = !on;
+    $('#br-rel-label').lastChild.textContent = on ? ' Only matching my CV' : ' Only matching the profile';
+    if (on) {
+      $('#match-chips').innerHTML = personal.terms.map((x, i) =>
+        `<span class="chip term${x.custom ? ' custom' : ''}" title="weight ${x.w}">${esc(x.t)}<button type="button" data-rm-term="${i}" aria-label="Remove">✕</button></span>`).join('');
+    }
+  }
 
   const prefs = (() => {
     try { return { relevant: true, sort: 'deadline', ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
@@ -33,7 +164,10 @@
       all = (data.positions || []).filter(p => !p.deadline || daysFromToday(p.deadline) >= 0);
       meta = data;
       $('#browse').hidden = false;
+      loadPersonal();
+      applyPersonal();
       restoreControls();
+      renderMatchBar();
       render();
     } catch { /* no data yet, or opened as a local file */ }
   }
@@ -56,11 +190,11 @@
 
   function filtered() {
     const q = ($('#br-search').value || '').trim().toLowerCase();
-    let list = prefs.relevant ? all.filter(p => p.relevant) : all;
+    let list = prefs.relevant ? all.filter(relOf) : all;
     if (q) {
       const terms = q.split(/\s+/);
       list = list.filter(p => {
-        const hay = [p.title, p.titleAlt, p.institution, p.city, p.country, p.field, p.summary, p.kind, (p.matched || []).join(' ')]
+        const hay = [p.title, p.titleAlt, p.institution, p.city, p.country, p.field, p.summary, p.kind, hitsOf(p).join(' ')]
           .join(' ').toLowerCase();
         return terms.every(t => hay.includes(t));
       });
@@ -76,8 +210,8 @@
     const far = '9999-12-31';
     const sorters = {
       deadline: (a, b) => (a.deadline || far).localeCompare(b.deadline || far),
-      newest: (a, b) => (b.firstSeen || '').localeCompare(a.firstSeen || '') || (b.score - a.score),
-      match: (a, b) => b.score - a.score || (a.deadline || far).localeCompare(b.deadline || far),
+      newest: (a, b) => (b.firstSeen || '').localeCompare(a.firstSeen || '') || (scoreOf(b) - scoreOf(a)),
+      match: (a, b) => scoreOf(b) - scoreOf(a) || (a.deadline || far).localeCompare(b.deadline || far),
     };
     return list.slice().sort(sorters[prefs.sort] || sorters.deadline);
   }
@@ -94,10 +228,10 @@
     const list = filtered();
     const tracked = C.tracked();
     const today = todayISO();
-    const relevantCount = all.filter(p => p.relevant).length;
+    const relevantCount = all.filter(relOf).length;
     const newToday = list.filter(p => p.firstSeen === today).length;
     $('#br-summary').innerHTML =
-      `<strong>${list.length}</strong> shown · ${all.length} open calls in total, ${relevantCount} match your profile` +
+      `<strong>${list.length}</strong> shown · ${all.length} open calls in total, ${relevantCount} match ${isPersonal() ? 'your CV' : 'the profile'}` +
       (newToday ? ` · <strong>${newToday} new today</strong>` : '') +
       (meta.updatedAt ? ` · updated ${esc(new Date(meta.updatedAt).toLocaleString())}` : '');
     const srcInfo = Object.entries(meta.sources || {})
@@ -118,7 +252,7 @@
             ${deadlineChip(p.deadline)}
             <span class="chip">🔎 ${esc(p.source)}</span>
             ${p.kind || p.type ? `<span class="chip">${esc(p.kind || p.type)}</span>` : ''}
-            ${(p.matched || []).slice(0, 4).map(m => `<span class="chip kw">${esc(m)}</span>`).join('')}
+            ${hitsOf(p).slice(0, 4).map(m => `<span class="chip kw">${esc(m)}</span>`).join('')}
           </div>
           ${p.summary || p.field ? `<details><summary>Details</summary>
             ${p.field ? `<p class="muted"><strong>Field:</strong> ${esc(p.field)}</p>` : ''}
@@ -144,7 +278,7 @@
     C.add({
       title: p.title, type: p.type, institution: p.institution, country: p.country, city: p.city,
       callUrl: p.url, deadline: p.deadline, salary: p.salary, duration: p.duration,
-      applyUrl: p.applyUrl, keywords: (p.matched || []).join(', '), source: p.source,
+      applyUrl: p.applyUrl, keywords: hitsOf(p).join(', '), source: p.source,
       procedure: [p.titleAlt, p.summary].filter(Boolean).join('\n\n'),
       notes: p.kind ? `Position type at source: ${p.kind}` : '',
     }, { sourceId: p.id });
@@ -169,6 +303,54 @@
     $('#br-toggle').textContent = body.hidden ? 'Show' : 'Hide';
   });
   C.onChange(() => { if (all.length) render(); });
+
+  function setPersonal(next, msg) {
+    personal = next;
+    savePersonal();
+    applyPersonal();
+    if (isPersonal() && prefs.sort === 'deadline') { prefs.sort = 'match'; $('#br-sort').value = 'match'; }
+    renderMatchBar();
+    rerender();
+    if (msg) $('#match-status').textContent = msg;
+  }
+
+  $('#match-file').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const status = $('#match-status');
+    status.textContent = `Reading ${file.name}…`;
+    try {
+      if (!window.CareerlyCV) throw new Error('The CV reader did not load. Please reload the page.');
+      const text = await window.CareerlyCV.extractText(file);
+      const terms = buildTerms(text);
+      if (terms.length < 3) throw new Error('Could not find enough research topics in this CV to match on.');
+      setPersonal({ name: file.name.replace(/\.[^.]+$/, ''), terms, savedAt: Date.now() },
+        `Found ${terms.length} topics in your CV. Remove any that don't fit, or add your own.`);
+    } catch (err) {
+      status.textContent = err.message;
+    }
+  });
+  $('#match-clear').addEventListener('click', () => {
+    if (!confirm('Forget your CV topics on this browser and go back to the default ranking?')) return;
+    setPersonal(null, '');
+  });
+  $('#match-chips').addEventListener('click', e => {
+    const i = e.target.dataset.rmTerm;
+    if (i === undefined) return;
+    personal.terms.splice(Number(i), 1);
+    setPersonal(personal, '');
+  });
+  $('#match-add').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const t = norm(e.target.value).trim();
+    e.target.value = '';
+    if (!t || personal.terms.some(x => x.t === t)) return;
+    const top = personal.terms[0] ? personal.terms[0].w : 3;
+    personal.terms.unshift({ t, w: top, custom: true });
+    setPersonal(personal, `Added "${t}".`);
+  });
 
   load();
 })();

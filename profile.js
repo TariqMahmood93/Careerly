@@ -163,19 +163,26 @@
       .replace(/^(.*\b(?:phone|tel|telephone|mobile|cell)\b\s*[:.]?).*$/gim, '$1 [removed]');
   }
 
+  // Shared with positions.js (personal matching), which never uploads the text anywhere
+  async function extractCvText(file) {
+    let text;
+    if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') text = await pdfToText(file);
+    else if (/\.(txt|md|markdown|tex)$/i.test(file.name) || file.type.startsWith('text/')) text = await file.text();
+    else throw new Error('Please upload a PDF or a text (.txt / .md) file. For Word files, save as PDF first.');
+    text = tidy(text);
+    if (text.length < 200) throw new Error('Very little text was found. If the PDF is a scanned image, upload a text-based PDF.');
+    return text;
+  }
+  window.CareerlyCV = { extractText: extractCvText };
+
   $('#cv-file').addEventListener('change', async e => {
     const file = e.target.files[0];
     e.target.value = '';
     if (!file) return;
     $('#cv-file-name').textContent = `Reading ${file.name}…`;
     try {
-      let text;
-      if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') text = await pdfToText(file);
-      else if (/\.(txt|md|markdown|tex)$/i.test(file.name) || file.type.startsWith('text/')) text = await file.text();
-      else throw new Error('Please upload a PDF or a text (.txt / .md) file. For Word files, save as PDF first.');
-      text = tidy(text);
+      let text = await extractCvText(file);
       if ($('#cv-redact').checked) text = redact(text);
-      if (text.length < 200) throw new Error('Very little text was found. If the PDF is a scanned image, upload a text-based PDF.');
       $('#cv-text').value = text;
       $('#cv-file-name').textContent = `${file.name}: ${text.length.toLocaleString()} characters extracted. Check the text below, then save.`;
     } catch (err) {

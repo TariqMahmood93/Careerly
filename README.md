@@ -26,6 +26,13 @@ Every morning a GitHub Actions job ([`scripts/fetch_positions.py`](scripts/fetch
 
 It scores each one against your topics. In the app, **All open positions** shows the matches by default. Untick *Only matching my profile* to see everything, and filter by country, source and type.
 
+### 🎯 Match to your own CV (for anyone with the link)
+
+In **All open positions**, click **Match to my CV** and pick a PDF. The site reads the CV in your browser and picks out
+your research topics, giving rarer topics more weight. It then ranks every open position for you. You can remove topics
+or add your own. The CV and topics are stored only in that browser and never uploaded. Bandi MUR covers all subjects.
+The EURAXESS and jobs.ac.uk listings currently focus on computer science, data, AI and engineering.
+
 ## 🆕 Daily position search
 
 Every morning (06:00, Rome time) a scheduled Claude task searches the web for new postdoc and researcher
