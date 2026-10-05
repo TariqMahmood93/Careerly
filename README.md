@@ -17,6 +17,15 @@ No account, no server, no build step: it's a single static web page, and your da
 
 Every status change is logged with a date, so each position shows its own timeline.
 
+## 🔎 All open positions
+
+Every morning a GitHub Actions job ([`scripts/fetch_positions.py`](scripts/fetch_positions.py)) collects **every open call** from:
+- **Bandi MUR**: all *incarichi post-doc*, *incarichi di ricerca* and RTD/RTT posts, in all subjects (about 600 at a time).
+- **EURAXESS**: new offers in computer science, data, engineering and related fields, read one by one and accumulated over time.
+- **jobs.ac.uk**: research jobs matching ML, AI and data keywords.
+
+It scores each one against your topics. In the app, **All open positions** shows the matches by default. Untick *Only matching my profile* to see everything, and filter by country, source and type.
+
 ## 🆕 Daily position search
 
 Every morning (06:00, Rome time) a scheduled Claude task searches the web for new postdoc and researcher

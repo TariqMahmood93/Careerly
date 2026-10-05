@@ -122,6 +122,36 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; }
 .sugg-foot { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: auto; }
 .chip.new { background: var(--primary); color: var(--primary-ink); font-weight: 700; }
 
+/* ---------- All open positions ---------- */
+.browse {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 16px; margin-bottom: 18px; box-shadow: var(--shadow);
+}
+.browse h2 { margin: 0; font-size: 17px; }
+.br-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; align-items: center; }
+.br-controls input[type=search] { flex: 3 1 240px; }
+.br-controls select { flex: 1 1 150px; width: auto; }
+.br-rel { margin: 0; white-space: nowrap; }
+.br-sources { margin: 4px 0 10px; font-size: 12px; }
+.br-list { display: flex; flex-direction: column; gap: 8px; }
+.br-item {
+  display: flex; gap: 12px; align-items: flex-start; justify-content: space-between;
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; background: var(--bg);
+}
+.br-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.br-item h3 { margin: 0; font-size: 15px; line-height: 1.35; }
+.br-item h3 a { color: var(--text); text-decoration: none; word-break: normal; }
+.br-item h3 a:hover { color: var(--primary); text-decoration: underline; }
+.br-alt { font-size: 13px; }
+.br-item .inst { color: var(--muted); font-size: 13px; }
+.br-item details { font-size: 13px; }
+.br-item details p { margin: 4px 0; }
+.br-item summary { cursor: pointer; color: var(--primary); }
+.br-actions { flex-shrink: 0; font-size: 13px; }
+.chip.kw { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); }
+#br-more { margin: 10px auto 0; display: block; }
+#br-more[hidden] { display: none; }
+
 /* ---------- Stats ---------- */
 .stats {
   display: grid;
@@ -266,6 +296,7 @@ code { background: var(--surface-2); padding: 0 4px; border-radius: 4px; }
   .grid { grid-template-columns: 1fr; }
   .span-2 { grid-column: auto; }
   .list, .sugg-list { grid-template-columns: 1fr; }
+  .br-item { flex-direction: column; }
   .kv { grid-template-columns: 1fr; }
   .kv dt { margin-top: 6px; }
 }

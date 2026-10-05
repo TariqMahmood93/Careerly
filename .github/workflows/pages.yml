@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Pushes made by the collector use GITHUB_TOKEN, which doesn't trigger "push" workflows
+  workflow_run:
+    workflows: ["Collect open positions"]
+    types: [completed]
 
 permissions:
   contents: read

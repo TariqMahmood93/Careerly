@@ -359,19 +359,19 @@
     $('#btn-restore-dismissed').hidden = dismissed.size === 0;
   }
 
-  function acceptSuggestion(id) {
-    const x = suggestions.find(s => s.id === id);
-    if (!x) return;
+  // Copy an outside record (daily suggestion or collected position) into the tracker
+  function addToTracker(x, extra = {}) {
     const now = Date.now();
     const fields = ['title', 'type', 'reference', 'institution', 'group', 'pi', 'keywords', 'country',
       'city', 'callUrl', 'deadline', 'startDate', 'duration', 'salary', 'method', 'applyEmail',
       'applyUrl', 'emailSubject', 'procedure', 'contactName', 'contactEmail'];
-    const p = { id: uid(), createdAt: now, updatedAt: now, suggestionId: x.id, status: 'saved', priority: 'normal' };
+    const p = { id: uid(), createdAt: now, updatedAt: now, status: 'saved', priority: 'normal', ...extra };
     fields.forEach(f => { p[f] = x[f] ?? ''; });
     if (!TYPES.includes(p.type)) p.type = p.type ? 'Other' : 'Postdoc';
     if (!COUNTRIES.includes(p.country)) p.country = p.country ? 'Other' : '';
     if (!METHOD_LABEL[p.method]) p.method = p.applyEmail ? 'email' : p.applyUrl ? 'portal' : 'other';
-    p.notes = [x.why && `Why it matches (auto-search): ${x.why}`, x.source && `Found on: ${x.source}`].filter(Boolean).join('\n');
+    p.notes = [x.why && `Why it matches (auto-search): ${x.why}`, x.source && `Found on: ${x.source}`, x.notes]
+      .filter(Boolean).join('\n');
     p.docs = (Array.isArray(x.documents) && x.documents.length ? x.documents : DEFAULT_DOCS.slice(0, 4))
       .map(name => ({ name: String(name), done: false }));
     p.history = [{ status: 'saved', date: todayISO() }];
@@ -379,9 +379,28 @@
     persist();
     render();
     toast('Added to your tracker');
+    return p;
   }
 
+  function acceptSuggestion(id) {
+    const x = suggestions.find(s => s.id === id);
+    if (x) addToTracker(x, { suggestionId: x.id });
+  }
+
+  // Small API for positions.js (the "All open positions" browser)
+  const listeners = [];
+  window.Careerly = {
+    add: (x, extra) => addToTracker(x, extra),
+    tracked: () => ({
+      ids: new Set(positions.map(p => p.sourceId).filter(Boolean)),
+      urls: new Set(positions.map(p => p.callUrl).filter(Boolean)),
+    }),
+    onChange: fn => listeners.push(fn),
+    esc, fmtDate, daysFromToday, todayISO,
+  };
+
   function render() {
+    listeners.forEach(fn => { try { fn(); } catch { /* ignore */ } });
     renderSuggestions();
     renderCountryFilter();
     renderStats();

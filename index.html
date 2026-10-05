@@ -49,6 +49,34 @@
       <div class="sugg-list" id="sugg-list"></div>
     </section>
 
+
+    <section class="browse" id="browse" hidden>
+      <div class="sugg-head">
+        <div>
+          <h2>🔎 All open positions</h2>
+          <p class="muted" id="br-summary"></p>
+        </div>
+        <button class="btn small" id="br-toggle">Hide</button>
+      </div>
+      <div id="br-body">
+        <div class="br-controls">
+          <input type="search" id="br-search" placeholder="Search: e.g. LLM, Milano, data quality…">
+          <select id="br-country" aria-label="Country"></select>
+          <select id="br-source" aria-label="Source"></select>
+          <select id="br-type" aria-label="Position type"></select>
+          <select id="br-sort" aria-label="Sort">
+            <option value="deadline">Sort: deadline (soonest)</option>
+            <option value="match">Sort: best match</option>
+            <option value="newest">Sort: newest first</option>
+          </select>
+          <label class="check br-rel"><input type="checkbox" id="br-relevant" checked> Only matching my profile</label>
+        </div>
+        <p class="muted br-sources" id="br-sources"></p>
+        <div id="br-list" class="br-list"></div>
+        <button class="btn" id="br-more" hidden>Show more</button>
+      </div>
+    </section>
+
     <section class="stats" id="stats"></section>
 
     <section class="alerts" id="alerts"></section>
@@ -300,5 +328,6 @@
 
   <script src="app.js"></script>
   <script src="profile.js"></script>
+  <script src="positions.js"></script>
 </body>
 </html>
