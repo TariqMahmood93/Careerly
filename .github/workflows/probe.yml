@@ -11,17 +11,22 @@ jobs:
         run: |
           UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
           try() {
-            ids=$(curl -sSL -A "$UA" -H "Accept-Language: en" --max-time 40 "$1" | grep -o 'href="/jobs/[0-9]*"' | grep -o '[0-9]*' | head -10 | tr '\n' ' ')
+            ids=$(curl -sSL -A "$UA" -H "Cache-Control: no-cache" -H "Pragma: no-cache" --max-time 40 "$1" | grep -o 'href="/jobs/[0-9]*"' | grep -o '[0-9]*' | head -6 | tr '\n' ' ')
             echo "$1 => $ids"
           }
-          try 'https://euraxess.ec.europa.eu/jobs/search'
-          try 'https://euraxess.ec.europa.eu/jobs/search?page=1'
-          try 'https://euraxess.ec.europa.eu/jobs/search?page=3'
-          try 'https://euraxess.ec.europa.eu/jobs/search?f%5B0%5D=job_research_field%3A78'
-          try 'https://euraxess.ec.europa.eu/jobs/search?f%5B0%5D=job_research_field%3A78&page=1'
-          try 'https://euraxess.ec.europa.eu/jobs/search?keywords=machine%20learning&f%5B0%5D=job_research_field%3A78'
-          try 'https://euraxess.ec.europa.eu/jobs/search?keys=machine%20learning'
-          try 'https://euraxess.ec.europa.eu/jobs/search?search_api_fulltext=machine%20learning'
-          try 'https://euraxess.ec.europa.eu/jobs/search?keywords=deep%20learning'
-          try 'https://euraxess.ec.europa.eu/jobs/search?keywords=deep%20learning&page=2'
-          curl -sSL -A "$UA" --max-time 40 'https://euraxess.ec.europa.eu/jobs/search?f%5B0%5D=job_research_field%3A78' | grep -o 'Filter by [^"]*' | sort | uniq -c | sort -rn | head -40
+          R=$RANDOM
+          for i in 1 2; do
+            try "https://euraxess.ec.europa.eu/jobs/search?page=3&cb=$R$i"
+            try "https://euraxess.ec.europa.eu/jobs/search?f%5B0%5D=job_research_field%3A78&cb=$R$i"
+            try "https://euraxess.ec.europa.eu/jobs/search?f%5B0%5D=job_research_field%3A78&page=2&cb=$R$i"
+            try "https://euraxess.ec.europa.eu/jobs/search?keywords=machine%20learning&cb=$R$i"
+            sleep 3
+          done
+          try "https://euraxess.ec.europa.eu/jobs/search?page=3"
+          try "https://euraxess.ec.europa.eu/jobs/search?page=3"
+          try "https://euraxess.ec.europa.eu/jobs/search/field/78"
+          for p in rss feed jobs/rss jobs/feed jobs/search/rss rss.xml; do
+            echo "$p => $(curl -s -o /dev/null -w '%{http_code} %{content_type}' -A "$UA" https://euraxess.ec.europa.eu/$p)"
+          done
+          echo "--- posted dates on pages 0..4:"
+          for p in 0 1 2 3 4; do curl -sSL -A "$UA" -H "Cache-Control: no-cache" "https://euraxess.ec.europa.eu/jobs/search?page=$p&cb=$R$p" | grep -o 'Posted on: [^<]*' | sort | uniq -c | tr '\n' ';'; echo; done
