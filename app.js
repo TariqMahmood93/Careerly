@@ -124,12 +124,19 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
 
-  function toast(msg) {
+  function toast(msg, action) {
     const el = $('#toast');
     el.textContent = msg;
+    if (action) {
+      const b = document.createElement('button');
+      b.className = 'toast-action';
+      b.textContent = action.label;
+      b.addEventListener('click', () => { el.hidden = true; action.run(); });
+      el.appendChild(b);
+    }
     el.hidden = false;
     clearTimeout(toast.t);
-    toast.t = setTimeout(() => { el.hidden = true; }, 2500);
+    toast.t = setTimeout(() => { el.hidden = true; }, action ? 7000 : 2500);
   }
 
   function fillSelect(sel, items, { blank } = {}) {
@@ -263,9 +270,12 @@
         <div class="how">${esc(howToApplyShort(p))}</div>
         <div class="card-foot">
           <span>Updated ${esc(new Date(p.updatedAt || p.createdAt).toLocaleDateString())}</span>
-          <select class="quick-status" data-quick="${p.id}" title="Change status">
-            ${STATUSES.map(x => `<option value="${x.id}" ${x.id === p.status ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}
-          </select>
+          <span class="card-actions">
+            <select class="quick-status" data-quick="${p.id}" title="Change status">
+              ${STATUSES.map(x => `<option value="${x.id}" ${x.id === p.status ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}
+            </select>
+            <button type="button" class="icon-btn del-btn" data-del="${p.id}" title="Delete this position" aria-label="Delete">🗑</button>
+          </span>
         </div>
       </article>`;
     }).join('');
@@ -487,14 +497,31 @@
     if (e.key === 'Enter') { e.preventDefault(); addDoc(); }
   });
 
-  $('#btn-delete').addEventListener('click', () => {
-    const p = positions.find(x => x.id === editingId);
-    if (!p || !confirm(`Delete "${p.title}" at ${p.institution}? This cannot be undone.`)) return;
-    positions = positions.filter(x => x.id !== editingId);
+  // Delete with a few seconds to undo
+  function deletePosition(id) {
+    const index = positions.findIndex(x => x.id === id);
+    if (index < 0) return;
+    const [removed] = positions.splice(index, 1);
     persist();
-    $('#form-dialog').close();
     render();
-    toast('Deleted');
+    toast(`Deleted "${removed.title.length > 40 ? removed.title.slice(0, 40) + '…' : removed.title}"`, {
+      label: 'Undo',
+      run: () => {
+        positions.splice(Math.min(index, positions.length), 0, removed);
+        persist();
+        render();
+        toast('Restored');
+      },
+    });
+  }
+
+  $('#btn-delete').addEventListener('click', () => {
+    $('#form-dialog').close();
+    deletePosition(editingId);
+  });
+  $('#btn-detail-delete').addEventListener('click', () => {
+    $('#detail-dialog').close();
+    deletePosition(detailId);
   });
 
   // ---------- Detail view ----------
@@ -593,6 +620,8 @@
     toast(`Status → ${STATUS[p.status].label}`);
   });
   $('#list').addEventListener('click', e => {
+    const del = e.target.closest('[data-del]');
+    if (del) { deletePosition(del.dataset.del); return; }
     if (e.target.closest('select')) return;
     const card = e.target.closest('.card');
     if (card) openDetail(card.dataset.id);

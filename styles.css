@@ -317,3 +317,12 @@ code { background: var(--surface-2); padding: 0 4px; border-radius: 4px; }
 }
 
 .owner-note { margin: 2px 0 0; font-size: 12px; }
+
+/* Delete + undo */
+.card-actions { display: inline-flex; align-items: center; gap: 4px; }
+.del-btn { font-size: 15px; padding: 2px 6px; border-radius: 6px; opacity: .7; }
+.del-btn:hover { opacity: 1; background: var(--bad-bg); }
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast[hidden] { display: none; }
+.toast-action { background: none; border: 1px solid currentColor; color: inherit; border-radius: 6px;
+  padding: 2px 10px; font: inherit; font-weight: 600; cursor: pointer; }
