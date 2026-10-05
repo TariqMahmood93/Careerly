@@ -4,16 +4,45 @@ Each morning a scheduled Claude session follows these steps to fill the "New pos
 inbox in the Careerly app.
 
 1. Read `data/profile.md` (the candidate profile) and `data/suggestions.json` (what is already listed).
-2. Search the web for **currently open** calls in Europe that match the profile. Run at least 10 varied
-   searches, mixing core keywords with position types and sources, for example:
-   - EURAXESS (euraxess.ec.europa.eu/jobs), AcademicPositions.eu, jobs.ac.uk, ELLIS (ellis.eu/jobs),
-     Nature Careers, university career pages, MSCA Postdoctoral Fellowship hosting offers,
-     Italian "assegno di ricerca" / RTD-A calls, CNR, Max Planck, Inria, ETH/EPFL, KU Leuven, TU Delft, etc.
-   - Example queries: "postdoc large language models 2026 Europe", "postdoc data quality machine learning",
-     "postdoc sentence embeddings NLP", "research fellow trustworthy AI data", "postdoc entity resolution",
-     "postdoc graph neural networks fairness", "assegno di ricerca LLM", "MSCA postdoctoral fellowship host
-     machine learning data management".
-3. For each candidate call, open the call page and extract the real details. **Never invent details.**
+2. Search the web for **currently open** calls that match the profile. Cover **every source group below
+   on every run**, at least 4 queries per group and at least 20 queries in total. When a source's pages can't be
+   opened (network policy), use WebSearch with `allowed_domains` set to that site. That still returns its listings.
+
+   **A. Italy: Bandi MUR (bandi.mur.gov.it).** Required every day. Use `allowed_domains: ["bandi.mur.gov.it"]`
+   and Italian + English terms. The site has separate sections; cover all of them:
+   - Incarichi post-doc (`incarichipostdoc.php`), the main Italian postdoc contract
+   - Contratti / Incarichi di ricerca (`incarichidiricerca.php`)
+   - Assegni di ricerca (`bandi.php`), older-type calls still published
+   - Ricercatori a tempo determinato, RTD / RTT (`jobs.php`)
+   Example queries: "incarico post-doc intelligenza artificiale", "incarico post doc machine learning",
+   "contratto di ricerca large language models", "assegno di ricerca deep learning", "data quality imputazione dati",
+   "elaborazione del linguaggio naturale", "sistemi di elaborazione delle informazioni IINF-05/A",
+   "ricercatore a tempo determinato informatica INFO-01/A", "entity resolution", "basi di dati machine learning".
+   Also run 1–2 open-web searches for Italian calls published on university sites (e.g. "bando incarico post-doc
+   LLM 2026 università", plus CNR / FBK / IIT calls).
+
+   **B. Other EU countries: EURAXESS (euraxess.ec.europa.eu/jobs).** Required every day. Use
+   `allowed_domains: ["euraxess.ec.europa.eu"]`. Examples: "postdoc large language models", "postdoc machine
+   learning data quality", "researcher natural language processing embeddings", "postdoc trustworthy AI",
+   "postdoc graph neural networks", "MSCA postdoctoral fellowship hosting machine learning". Add 2–3 open-web
+   searches on ELLIS (ellis.eu/jobs), AcademicPositions and Nature Careers.
+
+   **C. UK and Ireland.** Required every day.
+   - UK: `allowed_domains: ["jobs.ac.uk"]` (e.g. "research associate machine learning", "research fellow
+     large language models", "research associate natural language processing"); also FindAPostDoc.
+   - Ireland: Insight Centre (insight-centre.org), ADAPT Centre (adaptcentre.ie), Research Ireland
+     (researchireland.ie), IrishJobs academic listings, and the job pages of TCD, UCD, UCC, University of Galway,
+     DCU, TU Dublin and Maynooth (e.g. "postdoctoral researcher machine learning Ireland",
+     "research fellow NLP Dublin").
+
+   **D. Other non-EU Europe.** Switzerland (ETH/EPFL, Empa, IDSIA), Norway (jobbnorge.no), Iceland:
+   2–3 queries.
+
+   Record the source in each item's `source` field (e.g. "Bandi MUR", "EURAXESS", "jobs.ac.uk", "Insight Centre").
+   For Bandi MUR items, put the MUR call link in `callUrl` and the university's own application page (often PICA,
+   pica.cineca.it) in `applyUrl` when known.
+
+3. For each candidate call, open the call page if the network allows it and extract the real details. **Never invent details.**
    Leave a field as "" when the call does not state it.
 4. Keep only calls that: are open (deadline today or later, or not stated but posted recently),
    match the profile (core keywords weigh most), and respect the "Exclude" list.
@@ -49,6 +78,7 @@ inbox in the Careerly app.
   "procedure": "Short summary of how to apply, as stated in the call",
   "documents": ["CV", "Cover letter", "..."],
   "keywords": "comma-separated topics of the position",
+  "source": "Bandi MUR | EURAXESS | jobs.ac.uk | ...",
   "matchScore": 1-5,
   "why": "One or two sentences on why it matches the candidate's profile"
 }

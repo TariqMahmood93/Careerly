@@ -20,7 +20,7 @@ Every status change is logged with a date, so each position shows its own timeli
 ## 🆕 Daily position search
 
 Every morning (06:00, Rome time) a scheduled Claude task searches the web for new postdoc and researcher
-calls that match the profile in [`data/profile.md`](data/profile.md). It adds them to
+calls that match the profile in [`data/profile.md`](data/profile.md). It checks **Bandi MUR** (Italy), **EURAXESS** (other EU countries), **jobs.ac.uk** and Irish research centres and universities (UK and Ireland), plus Switzerland and Norway. It adds them to
 [`data/suggestions.json`](data/suggestions.json) on `main`. When you open the app, they appear at the top under
 **New positions found for you**, where you can **+ Add to tracker** or **Dismiss** each one.
 

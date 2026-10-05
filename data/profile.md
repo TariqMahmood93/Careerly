@@ -32,7 +32,12 @@ English (professional). Urdu, Pashto (native). No German/French/Dutch/Nordic lan
 ## What to look for
 - Position types: Postdoc, Research Fellow, Researcher / Research Scientist, MSCA Postdoctoral Fellowship
   hosting offers, junior/early-career research positions (RTD-A in Italy), Research Engineer in AI labs.
-- Countries: any EU country plus Norway, Switzerland, UK, Iceland. Italy is welcome.
+- Countries: Italy (search Bandi MUR every day), all other EU countries (EURAXESS every day), the UK and
+  Ireland (every day), plus Switzerland, Norway and Iceland.
+- Italian contract types to include: incarico post-doc, contratto / incarico di ricerca, assegno di ricerca,
+  RTD-A / RTT (ricercatore a tempo determinato). Exclude "borse di studio" for graduates and doctorate places.
+- Italian sectors that fit: IINF-05/A (ex ING-INF/05, Sistemi di elaborazione delle informazioni) and
+  INFO-01/A (ex INF/01, Informatica).
 - Level: early-career (0–5 years post-PhD).
 
 ## Exclude

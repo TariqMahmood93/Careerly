@@ -326,6 +326,7 @@
           ${stars ? `<span class="chip" title="Match with your profile">${stars}</span>` : ''}
           ${loc ? `<span class="chip">📍 ${esc(loc)}</span>` : ''}
           ${x.type ? `<span class="chip">${esc(x.type)}</span>` : ''}
+          ${x.source ? `<span class="chip" title="Where it was found">🔎 ${esc(x.source)}</span>` : ''}
           ${x.deadline ? deadlineChip({ deadline: x.deadline, status: 'saved' }) : '<span class="chip">⏰ deadline not stated</span>'}
         </div>
         ${x.why ? `<p class="why">${esc(x.why)}</p>` : ''}
@@ -352,7 +353,7 @@
     if (!TYPES.includes(p.type)) p.type = p.type ? 'Other' : 'Postdoc';
     if (!COUNTRIES.includes(p.country)) p.country = p.country ? 'Other' : '';
     if (!METHOD_LABEL[p.method]) p.method = p.applyEmail ? 'email' : p.applyUrl ? 'portal' : 'other';
-    p.notes = x.why ? `Why it matches (auto-search): ${x.why}` : '';
+    p.notes = [x.why && `Why it matches (auto-search): ${x.why}`, x.source && `Found on: ${x.source}`].filter(Boolean).join('\n');
     p.docs = (Array.isArray(x.documents) && x.documents.length ? x.documents : DEFAULT_DOCS.slice(0, 4))
       .map(name => ({ name: String(name), done: false }));
     p.history = [{ status: 'saved', date: todayISO() }];
