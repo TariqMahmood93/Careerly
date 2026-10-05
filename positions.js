@@ -135,10 +135,7 @@
 
   function renderMatchBar() {
     const on = isPersonal();
-    $('#match-mode').innerHTML = on
-      ? `🎯 Ranked for <strong>your CV</strong>${personal.name ? ` (${esc(personal.name)})` : ''}. It's stored only in this browser.`
-      : '🎯 Ranked for the site owner\'s research profile. <strong>Upload your CV</strong> to rank positions for you. It stays in your browser.';
-    $('#match-upload-label').firstChild.textContent = on ? '📄 Replace CV ' : '📄 Match to my CV ';
+    $('#match-upload-label').firstChild.textContent = on ? `📄 Matching: ${personal.name || 'my CV'} (replace) ` : '📄 Match to my CV ';
     $('#match-clear').hidden = !on;
     $('#match-terms').hidden = !on;
     $('#br-rel-label').lastChild.textContent = on ? ' Only matching my CV' : ' Only matching the profile';

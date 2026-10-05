@@ -43,11 +43,6 @@
         <button class="btn small" id="br-toggle">Hide</button>
       </div>
       <div id="br-body">
-        <div class="match-bar">
-          <span id="match-mode" class="match-mode"></span>
-          <label class="btn small primary" id="match-upload-label">📄 Match to my CV <input type="file" id="match-file" accept=".pdf,application/pdf,.txt,.md,text/plain" hidden></label>
-          <button type="button" class="btn small" id="match-clear" hidden>Use default ranking</button>
-        </div>
         <div id="match-terms" class="match-terms" hidden>
           <span class="muted">Your topics (rarer ones count more):</span>
           <span id="match-chips"></span>
@@ -64,6 +59,8 @@
             <option value="match">Sort: best match</option>
             <option value="newest">Sort: newest first</option>
           </select>
+          <label class="btn small" id="match-upload-label" title="Rank all positions against your own CV. It stays in your browser.">📄 Match to my CV <input type="file" id="match-file" accept=".pdf,application/pdf,.txt,.md,text/plain" hidden></label>
+          <button type="button" class="btn small" id="match-clear" title="Forget my CV and use the default ranking" hidden>✕ Stop matching my CV</button>
           <label class="check br-rel" id="br-rel-label"><input type="checkbox" id="br-relevant" checked> Only matching the profile</label>
         </div>
         <p class="muted br-sources" id="br-sources"></p>
