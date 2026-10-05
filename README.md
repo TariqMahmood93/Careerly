@@ -19,7 +19,7 @@ Every status change is logged with a date, so each position shows its own timeli
 
 ## 🔎 All open positions
 
-Every morning a GitHub Actions job ([`scripts/fetch_positions.py`](scripts/fetch_positions.py)) collects **every open call** from:
+Every day at 08:45 Rome time a GitHub Actions job ([`scripts/fetch_positions.py`](scripts/fetch_positions.py)) collects **every open call** from:
 - **Bandi MUR**: all *incarichi post-doc*, *incarichi di ricerca* and RTD/RTT posts, in all subjects (about 600 at a time).
 - **EURAXESS**: new offers in computer science, data, engineering and related fields, read one by one and accumulated over time.
 - **jobs.ac.uk**: research jobs matching ML, AI and data keywords.
@@ -35,7 +35,7 @@ The EURAXESS and jobs.ac.uk listings currently focus on computer science, data, 
 
 ## 🆕 Daily position search
 
-Every morning (06:00, Rome time) a scheduled Claude task searches the web for new postdoc and researcher
+Every morning (09:30, Rome time) a scheduled Claude task searches the web for new postdoc and researcher
 calls that match the profile in [`data/profile.md`](data/profile.md). It checks **Bandi MUR** (Italy), **EURAXESS** (other EU countries), **jobs.ac.uk** and Irish research centres and universities (UK and Ireland), plus Switzerland and Norway. The full catalogue of about 120 job boards, institutes and fellowship programmes is in [`data/SOURCES.md`](data/SOURCES.md). It covers ★ sources daily and rotates through the others by weekday. It adds them to
 [`data/suggestions.json`](data/suggestions.json) on `main`. In the app they appear in **All open positions**
 marked **⭐ Claude pick**, with a short note on why each one matches. Pick *Claude daily pick* in the source filter to

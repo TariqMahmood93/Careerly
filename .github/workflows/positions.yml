@@ -1,10 +1,13 @@
 name: Collect open positions
 
 # Reads ALL open calls from Bandi MUR, EURAXESS and jobs.ac.uk into data/positions.json.
-# Runs every morning before the Claude daily search (05:15 Rome summer time / 04:15 winter).
+# Runs every day at 08:45 Rome time, so new positions are on the site by 10:00 (the Claude
+# daily search follows at 09:30). GitHub cron is UTC-only, so two schedules cover summer
+# (UTC+2) and winter (UTC+1) time and the "Rome time check" step skips the wrong one.
 on:
   schedule:
-    - cron: '15 3 * * *'
+    - cron: '45 6 * * *'
+    - cron: '45 7 * * *'
   workflow_dispatch:
 
 permissions:
@@ -19,18 +22,40 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
+      - name: Rome time check
+        id: when
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          OFFSET=$(TZ=Europe/Rome date +%z)   # +0200 in summer, +0100 in winter
+          echo "Rome time now: $(TZ=Europe/Rome date '+%F %H:%M') ($OFFSET), trigger: ${SCHEDULE:-manual}"
+          RUN=true
+          if [ -n "$SCHEDULE" ]; then
+            # 06:45 UTC = 08:45 Rome in summer; 07:45 UTC = 08:45 Rome in winter
+            if [ "$OFFSET" = "+0200" ] && [ "$SCHEDULE" != "45 6 * * *" ]; then RUN=false; fi
+            if [ "$OFFSET" = "+0100" ] && [ "$SCHEDULE" != "45 7 * * *" ]; then RUN=false; fi
+          fi
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+          echo "Collect today: $RUN"
       - uses: actions/checkout@v4
+        if: steps.when.outputs.run == 'true'
       - uses: actions/setup-python@v5
+        if: steps.when.outputs.run == 'true'
         with:
           python-version: '3.12'
       - name: Keep the Supabase project awake (free projects pause after 7 idle days)
+        if: steps.when.outputs.run == 'true'
         continue-on-error: true
-        run: curl -fsS -o /dev/null -w "Supabase auth health: %{http_code}\n" -H "apikey: sb_publishable_I6ffqrAWnfFTabDv2w9oFA_NeuVmZXa" https://kipuqqslpnmpixsdtvir.supabase.co/auth/v1/health
+        run: |
+          curl -fsS -o /dev/null -w "Supabase auth health: %{http_code}\n" \
+            -H "apikey: sb_publishable_I6ffqrAWnfFTabDv2w9oFA_NeuVmZXa" \
+            https://kipuqqslpnmpixsdtvir.supabase.co/auth/v1/health
       - name: Collect positions
+        if: steps.when.outputs.run == 'true'
         timeout-minutes: 70
         run: python3 -u scripts/fetch_positions.py --out data/positions.json
       - name: Save results
-        if: always()
+        if: always() && steps.when.outputs.run == 'true'
         run: |
           [ -f data/positions.json ] || { echo "Nothing collected"; exit 0; }
           git config user.name "careerly-bot"

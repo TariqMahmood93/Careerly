@@ -349,6 +349,7 @@
   window.CareerlyMatch = {
     get: () => personal,
     set: next => {
+      if (JSON.stringify(next || null) === JSON.stringify(personal || null)) return; // unchanged: keep the view as it is
       if (all.length) setPersonal(next, '', { silent: true });
       else { personal = next; savePersonal({ silent: true }); }
     },
@@ -394,4 +395,27 @@
   });
 
   load();
+
+  // Keep an open page fresh: new positions arrive every morning (by 10:00 Rome time).
+  // Re-check every 30 minutes and whenever the tab comes back into view; only re-render
+  // if the data actually changed, so filters and scrolling aren't disturbed.
+  let lastStamp = '';
+  async function refreshIfChanged() {
+    const [d, p] = await Promise.all([getJson(URL), getJson('data/suggestions.json')]);
+    const stamp = `${d && d.updatedAt}|${p && p.updatedAt}`;
+    if (!lastStamp) { lastStamp = stamp; return; }
+    if (stamp !== lastStamp) {
+      lastStamp = stamp;
+      const keepShown = shown;
+      await load();
+      shown = keepShown;
+      render();
+      C.toast && C.toast('New positions have arrived.');
+    }
+  }
+  refreshIfChanged();
+  setInterval(refreshIfChanged, 30 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshIfChanged();
+  });
 })();
