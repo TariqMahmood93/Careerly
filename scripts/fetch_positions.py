@@ -20,6 +20,7 @@ import json
 import re
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -82,6 +83,11 @@ def score(*texts):
 # HTTP + text helpers
 # ---------------------------------------------------------------------------
 FIXTURES = None
+HOST_DELAY = {'euraxess.ec.europa.eu': 2.5}  # EURAXESS rate-limits quickly
+
+
+class RateLimited(Exception):
+    pass
 
 
 def get(url, retries=2):
@@ -96,8 +102,16 @@ def get(url, retries=2):
             req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept-Language': 'en,it;q=0.8'})
             with urllib.request.urlopen(req, timeout=45) as r:
                 data = r.read().decode(r.headers.get_content_charset() or 'utf-8', errors='replace')
-            time.sleep(DELAY)
+            time.sleep(HOST_DELAY.get(urllib.parse.urlparse(url).hostname, DELAY))
             return data
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                raise RateLimited(url) from e
+            if e.code == 404 or attempt == retries:
+                if e.code != 404:
+                    print(f'  ! {url}: {e}', file=sys.stderr)
+                return ''
+            time.sleep(2 * (attempt + 1))
         except Exception as e:  # noqa: BLE001
             if attempt == retries:
                 print(f'  ! {url}: {e}', file=sys.stderr)
@@ -200,15 +214,20 @@ def mur_detail(url):
     return out
 
 
+MUR_DETAIL_BUDGET = 25 * 60  # seconds per run for reading call pages; the rest continue tomorrow
+
+
 def fetch_mur(cache):
     items = []
+    t0 = time.time()
+    fetched = 0
     for script, kind, ptype, status_param in MUR_SECTIONS:
         url = (f'{MUR}/{script}/public/' + ('cercaJobs' if script == 'jobs.php' else 'cercaFellowship')
                + f'?{status_param}=2-3&bb_type_code=%25&azione=cerca')
         page = get(url)
         found = re.search(r'trovati (\d+) bandi', page)
         blocks = re.findall(r'<p>\s*<em class="aperto">(.*?)</p>', page, flags=re.S)
-        print(f'  MUR {kind}: {found.group(1) if found else "?"} listed, {len(blocks)} parsed')
+        print(f'  MUR {kind}: {found.group(1) if found else "?"} listed, {len(blocks)} parsed', flush=True)
         for b in blocks:
             link = re.search(r'href="(/[^"]+/id_(?:fellow|job)/(\d+))">(.*?)</a>', b, flags=re.S)
             if not link:
@@ -219,8 +238,12 @@ def fetch_mur(cache):
             settore = re.findall(r'<strong>\s*(?:Settore|S\.S\.D\.)\s*(.*?)</strong>', b, flags=re.S)
             pid = f'mur-{script.split(".")[0]}-{num}'
             det = cache.get(pid, {}).get('_detail')
-            if det is None:
+            store = det is not None
+            if det is None and time.time() - t0 < MUR_DETAIL_BUDGET:
                 det = mur_detail(MUR + path)
+                fetched += 1
+                store = bool(det)
+            det = det or {}
             title_en = det.get('title_en', '')
             desc = det.get('desc_en') or det.get('desc_it') or ''
             field = ' / '.join(x for x in [text(settore[0]) if settore else '', det.get('ssd', ''), det.get('area', '')] if x)
@@ -234,8 +257,9 @@ def fetch_mur(cache):
                 'field': short(field, 200), 'summary': short(desc, 500),
                 'salary': (det.get('amount', '') + ' € / year') if det.get('amount', '').isdigit() else det.get('amount', ''),
                 'duration': det.get('duration', ''),
-                'score': sc, 'matched': hits, '_detail': det,
+                'score': sc, 'matched': hits, **({'_detail': det} if store else {}),
             })
+    print(f'  MUR: read {fetched} call pages this run ({int(time.time() - t0)}s)', flush=True)
     return items
 
 
@@ -295,8 +319,9 @@ def fetch_jobsacuk(cache):
 # offer pages one by one (ids are sequential), politely, remembering where we stopped.
 # ---------------------------------------------------------------------------
 EUX = 'https://euraxess.ec.europa.eu'
-EUX_BACKFILL = 1500      # ids to look back on the very first run
-EUX_MAX_PER_RUN = 700    # cap per daily run
+EUX_BACKFILL = 1200      # how far back to start on the very first run
+EUX_MAX_PER_RUN = 300    # offers read per run (~2.5 s each); a backlog is caught up over several days
+EUX_BUDGET = 20 * 60     # seconds per run
 EUX_KEEP_FIELDS = re.compile(r'computer|informatic|database|engineering|mathemat|statist|modelling|information|'
                              r'communication|technology|linguistic|language', re.I)
 
@@ -339,11 +364,20 @@ def fetch_euraxess(cache):
     if backfill:
         last = top - EUX_BACKFILL
     start = max(last + 1, top - (EUX_BACKFILL if backfill else EUX_MAX_PER_RUN) + 1)
-    print(f'  EURAXESS: checking offers {start}..{top}')
-    items, checked = [], 0
-    for num in range(start, top + 1):
-        o = eux_offer(num)
+    end = min(top, start + EUX_MAX_PER_RUN - 1)
+    print(f'  EURAXESS: newest offer {top}; reading {start}..{end}', flush=True)
+    items, checked, done_until, t0 = [], 0, start - 1, time.time()
+    for num in range(start, end + 1):
+        if time.time() - t0 > EUX_BUDGET:
+            print('  EURAXESS: time budget used; continuing tomorrow')
+            break
+        try:
+            o = eux_offer(num)
+        except RateLimited:
+            print(f'  EURAXESS: rate-limited at {num}; stopping politely, will continue tomorrow')
+            break
         checked += 1
+        done_until = num
         if not o:
             continue
         pid = f'eux-{num}'
@@ -352,7 +386,6 @@ def fetch_euraxess(cache):
         sc, hits = score(o['title'], o['summary'], o['field'])
         if sc == 0 and not EUX_KEEP_FIELDS.search(o['field']):
             continue  # unrelated discipline (e.g. history, biology); skip to keep the file small
-        cache[pid] = {'_detail': o}
         ptype = ('MSCA Postdoctoral Fellowship' if re.search(r'\bMSCA\b|Marie', o['title']) else
                  'Postdoc' if re.search(r'post-?doc', o['title'], re.I) or 'R2' in o['profile'] else
                  'Research Fellow' if re.search(r'fellow', o['title'], re.I) else
@@ -367,8 +400,8 @@ def fetch_euraxess(cache):
             'score': sc, 'matched': hits,
             **({'firstSeen': (TODAY - dt.timedelta(days=1)).isoformat()} if backfill else {}),
         })
-    cache['_eux_state'] = {'_detail': {'lastId': top}}
-    print(f'  EURAXESS: {checked} offers checked, {len(items)} kept')
+    cache['_eux_state'] = {'_detail': {'lastId': done_until, 'newest': top}}
+    print(f'  EURAXESS: {checked} offers read, {len(items)} kept; {top - done_until} still to read', flush=True)
     return items
 
 
@@ -397,47 +430,61 @@ def main():
 
     fetchers = {'mur': ('Bandi MUR', fetch_mur), 'jac': ('jobs.ac.uk', fetch_jobsacuk), 'eux': ('EURAXESS', fetch_euraxess)}
     only = set(args.only.split(',')) if args.only else set(fetchers)
-    positions, sources = [], dict(old.get('sources', {}))
+    sources = dict(old.get('sources', {}))
+    had = {p.get('source') for p in old.get('positions', [])}
+    yesterday = (TODAY - dt.timedelta(days=1)).isoformat()
+    done = {}  # source name -> fresh list
+
+    def previous(name):
+        return [dict(p) for p in old.get('positions', []) if p.get('source') == name and is_open(p.get('deadline'))]
+
+    def save():
+        """Write the output now, using fresh data where collected and yesterday's otherwise."""
+        positions, details = [], {}
+        for _, (name, _) in fetchers.items():
+            for p in (done[name] if name in done else previous(name)):
+                p = dict(p)
+                p['firstSeen'] = (cache.get(p['id'], {}).get('firstSeen') or p.get('firstSeen')
+                                  or (TODAY.isoformat() if name in had else yesterday))
+                p['relevant'] = p['score'] >= 3
+                if '_detail' in p:
+                    details[p['id']] = p.pop('_detail')
+                elif p['id'] in cache and '_detail' in cache[p['id']]:
+                    details[p['id']] = cache[p['id']]['_detail']
+                positions.append(p)
+        if '_eux_state' in cache:
+            details['_eux_state'] = cache['_eux_state']['_detail']
+        positions.sort(key=lambda p: (not p['relevant'], p['deadline'] or '9999'))
+        out = {
+            'updatedAt': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
+            'sources': sources,
+            'counts': {'total': len(positions), 'relevant': sum(p['relevant'] for p in positions)},
+            'positions': positions,
+        }
+        with open(args.out, 'w', encoding='utf-8') as f:
+            json.dump(out, f, ensure_ascii=False, indent=0)
+            f.write('\n')
+        with open(args.out.replace('.json', '-cache.json'), 'w', encoding='utf-8') as f:
+            json.dump(details, f, ensure_ascii=False, separators=(',', ':'))
+        return out
+
     for key, (name, fn) in fetchers.items():
         if key not in only:
-            positions += [p for p in old.get('positions', []) if p.get('source') == name and is_open(p.get('deadline'))]
             continue
-        print(f'Fetching {name}…')
+        print(f'Fetching {name}…', flush=True)
         try:
             got = [p for p in fn(cache) if is_open(p['deadline'])]
             if key == 'eux':  # incremental: keep earlier offers that are still open
                 ids = {p['id'] for p in got}
-                got += [p for p in old.get('positions', []) if p.get('source') == name and p['id'] not in ids and is_open(p.get('deadline'))]
+                got += [p for p in previous(name) if p['id'] not in ids]
+            done[name] = got
             sources[name] = {'ok': True, 'count': len(got), 'checkedAt': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')}
         except Exception as e:  # keep yesterday's data for this source if it breaks
             print(f'  ! {name} failed: {e}', file=sys.stderr)
-            got = [p for p in old.get('positions', []) if p.get('source') == name and is_open(p.get('deadline'))]
             sources[name] = {**sources.get(name, {}), 'ok': False, 'error': str(e)[:200]}
-        positions += got
+        save()  # checkpoint after every source
 
-    # first-seen dates; on a source's first collection nothing counts as "new today"
-    yesterday = (TODAY - dt.timedelta(days=1)).isoformat()
-    had = {p.get('source') for p in old.get('positions', [])}
-    for p in positions:
-        p['firstSeen'] = (cache.get(p['id'], {}).get('firstSeen') or p.get('firstSeen')
-                          or (TODAY.isoformat() if p['source'] in had else yesterday))
-        p['relevant'] = p['score'] >= 3
-
-    new_details = {p['id']: p.pop('_detail') for p in positions if '_detail' in p}
-    if '_eux_state' in cache:
-        new_details['_eux_state'] = cache['_eux_state']['_detail']
-    positions.sort(key=lambda p: (not p['relevant'], p['deadline'] or '9999'))
-    out = {
-        'updatedAt': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
-        'sources': sources,
-        'counts': {'total': len(positions), 'relevant': sum(p['relevant'] for p in positions)},
-        'positions': positions,
-    }
-    with open(args.out, 'w', encoding='utf-8') as f:
-        json.dump(out, f, ensure_ascii=False, indent=0)
-        f.write('\n')
-    with open(args.out.replace('.json', '-cache.json'), 'w', encoding='utf-8') as f:
-        json.dump(new_details, f, ensure_ascii=False, separators=(',', ':'))
+    out = save()
     print(f'Done: {out["counts"]["total"]} open positions, {out["counts"]["relevant"]} relevant.')
 
 
