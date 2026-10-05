@@ -126,11 +126,13 @@
   function loadPersonal() {
     try { personal = JSON.parse(localStorage.getItem(PERSONAL_KEY) || 'null'); } catch { personal = null; }
   }
-  function savePersonal() {
+  const personalListeners = [];
+  function savePersonal({ silent = false } = {}) {
     try {
       if (personal) localStorage.setItem(PERSONAL_KEY, JSON.stringify(personal));
       else localStorage.removeItem(PERSONAL_KEY);
     } catch { /* storage unavailable: matching still works for this visit */ }
+    if (!silent) personalListeners.forEach(fn => { try { fn(personal); } catch { /* ignore */ } });
   }
 
   function renderMatchBar() {
@@ -333,15 +335,25 @@
   });
   C.onChange(() => { if (all.length) render(); });
 
-  function setPersonal(next, msg) {
+  function setPersonal(next, msg, { silent = false } = {}) {
     personal = next;
-    savePersonal();
+    savePersonal({ silent });
     applyPersonal();
     if (isPersonal() && prefs.sort === 'deadline') { prefs.sort = 'match'; $('#br-sort').value = 'match'; }
     renderMatchBar();
     rerender();
     if (msg) $('#match-status').textContent = msg;
   }
+
+  // used by cloud.js to keep the CV-based matching profile in the signed-in account
+  window.CareerlyMatch = {
+    get: () => personal,
+    set: next => {
+      if (all.length) setPersonal(next, '', { silent: true });
+      else { personal = next; savePersonal({ silent: true }); }
+    },
+    onChange: fn => personalListeners.push(fn),
+  };
 
   $('#match-file').addEventListener('change', async e => {
     const file = e.target.files[0];

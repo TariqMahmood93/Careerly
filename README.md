@@ -56,7 +56,16 @@ see only those. Use **+ Track** to add one to your applications.
 - **One-click email**: the application email opens your mail client with the required subject line already filled in.
 - **Backup**: export or import a `.json` backup, and export a `.csv` to open in Excel or Google Sheets.
 
-## ⚠️ About your data
+## 🔐 Accounts: your tracker on every device
+
+Click **🔐 Log in** and then **Create account**, using your email and a password. Once signed in, your tracked positions and
+your *Match to my CV* profile are saved in your account, a private Supabase database where each user can see only
+their own data. Log in on any laptop, phone or incognito window to see them. Anything you tracked before signing up
+is added to your account. Logging out clears this browser's copy, but your data stays safe in your account.
+
+Without an account the app works as before, storing everything in this browser only.
+
+## ⚠️ About your data (without an account)
 
 Everything is saved in your browser's local storage, on your own device only. That means:
 

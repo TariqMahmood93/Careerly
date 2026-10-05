@@ -6,6 +6,7 @@
   'use strict';
 
   const STORAGE_KEY = 'careerly.positions.v1';
+  const DELETED_KEY = 'careerly.deleted.v1'; // id -> time deleted, so other devices drop it too when syncing
   const META_KEY = 'careerly.meta.v1';
   const DAY = 24 * 60 * 60 * 1000;
   const NO_RESPONSE_DAYS = 60;
@@ -56,6 +57,8 @@
 
   // ---------- State ----------
   let positions = load(STORAGE_KEY, []);
+  let deleted = load(DELETED_KEY, {});
+  const persistListeners = [];
   let meta = load(META_KEY, { lastExport: null });
   let editingId = null;
   let formDocs = [];
@@ -76,9 +79,13 @@
     try { return localStorage.getItem(key) || ''; } catch { return ''; }
   }
 
-  function persist() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
-    localStorage.setItem(META_KEY, JSON.stringify(meta));
+  function persist({ silent = false } = {}) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
+      localStorage.setItem(DELETED_KEY, JSON.stringify(deleted));
+      localStorage.setItem(META_KEY, JSON.stringify(meta));
+    } catch { /* storage full or blocked: cloud sync (if logged in) still keeps the data */ }
+    if (!silent) persistListeners.forEach(fn => { try { fn(); } catch { /* ignore */ } });
   }
 
   function esc(s) {
@@ -327,6 +334,16 @@
       urls: new Set(positions.map(p => p.callUrl).filter(Boolean)),
     }),
     onChange: fn => listeners.push(fn),
+    // used by cloud.js to sync the tracker with the signed-in account
+    getState: () => ({ positions, deleted }),
+    setState: state => {
+      positions = Array.isArray(state.positions) ? state.positions : [];
+      deleted = state.deleted && typeof state.deleted === 'object' ? state.deleted : {};
+      persist({ silent: true });
+      render();
+    },
+    onPersist: fn => persistListeners.push(fn),
+    toast: (msg, action) => toast(msg, action),
     esc, fmtDate, daysFromToday, todayISO,
   };
 
@@ -422,12 +439,15 @@
     const index = positions.findIndex(x => x.id === id);
     if (index < 0) return;
     const [removed] = positions.splice(index, 1);
+    deleted[id] = Date.now();
     persist();
     render();
     toast(`Deleted "${removed.title.length > 40 ? removed.title.slice(0, 40) + '…' : removed.title}"`, {
       label: 'Undo',
       run: () => {
         positions.splice(Math.min(index, positions.length), 0, removed);
+        delete deleted[removed.id];
+        removed.updatedAt = Date.now();
         persist();
         render();
         toast('Restored');

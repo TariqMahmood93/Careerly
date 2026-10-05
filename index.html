@@ -16,6 +16,7 @@
       </div>
     </div>
     <div class="top-actions">
+      <button class="btn" id="btn-account">🔐 Log in</button>
       <button class="btn" id="btn-profile" title="Upload your CV and edit what the daily search looks for">👤 My profile &amp; CV</button>
       <button class="btn primary" id="btn-new">+ New position</button>
       <div class="menu">
@@ -318,10 +319,61 @@
     </form>
   </dialog>
 
+
+  <!-- Account (Supabase): sync tracker + CV matching across devices -->
+  <dialog id="account-dialog">
+    <div class="dialog-head">
+      <h2>Your account</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="dialog-body">
+      <div id="account-out">
+        <p class="muted" style="margin:0 0 12px">Log in to keep your <strong>tracked positions</strong> and your <strong>CV matching</strong>
+          in your account, so you see them on any laptop, phone or incognito window. Only you can see your data.
+          Without an account, everything stays in this browser only.</p>
+        <div class="grid">
+          <label class="span-2">Email
+            <input type="email" id="account-email-input" autocomplete="email" placeholder="you@example.com">
+          </label>
+          <label class="span-2">Password
+            <input type="password" id="account-password" autocomplete="current-password" placeholder="At least 8 characters">
+          </label>
+        </div>
+        <div class="account-actions">
+          <button type="button" class="btn primary" id="account-login">Log in</button>
+          <button type="button" class="btn" id="account-signup">Create account</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn small" id="account-reset">Forgot password?</button>
+        </div>
+        <p class="muted" style="font-size:12px;margin:10px 0 0">New here? Type your email and a password, then press <em>Create account</em>.
+          Anything you already tracked in this browser is added to your account.</p>
+      </div>
+      <div id="account-in" hidden>
+        <p style="margin:0 0 10px">Signed in as <strong id="account-email"></strong>. Your tracker and CV matching sync automatically.</p>
+        <div class="account-actions">
+          <button type="button" class="btn" id="account-sync">↻ Sync now</button>
+          <button type="button" class="btn danger" id="account-logout">Log out</button>
+        </div>
+        <fieldset style="margin-top:14px">
+          <legend>Change password</legend>
+          <div class="account-actions">
+            <input type="password" id="account-newpass" autocomplete="new-password" placeholder="New password (8+ characters)">
+            <button type="button" class="btn small" id="account-newpass-save">Update</button>
+          </div>
+        </fieldset>
+        <p class="muted" style="font-size:12px;margin:10px 0 0">To match positions to your CV, use <em>📄 Match to my CV</em> in
+          "All open positions". It's saved to your account too.</p>
+      </div>
+      <p id="account-status" class="profile-status"></p>
+    </div>
+  </dialog>
+
   <div id="toast" class="toast" hidden></div>
 
   <script src="app.js?v=__VERSION__"></script>
   <script src="profile.js?v=__VERSION__"></script>
   <script src="positions.js?v=__VERSION__"></script>
+  <script src="vendor/supabase/supabase.js?v=2.117.2"></script>
+  <script src="cloud.js?v=__VERSION__"></script>
 </body>
 </html>

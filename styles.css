@@ -336,3 +336,8 @@ code { background: var(--surface-2); padding: 0 4px; border-radius: 4px; }
 
 [hidden] { display: none !important; }
 #match-upload-label { display: inline-block; white-space: nowrap; }
+
+/* Account */
+.account-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.account-actions input { flex: 1 1 200px; width: auto; }
+.sync-state { font-size: 11px; color: var(--muted); margin-left: 4px; }
