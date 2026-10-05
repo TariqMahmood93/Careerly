@@ -3,13 +3,9 @@
 Each morning a scheduled Claude session follows these steps to fill the "New positions found for you"
 inbox in the Careerly app.
 
-1. Read the candidate's **CV and profile from the private repo `TariqMahmood93/careerly-private`**
-   (`cv.md` and `profile.md`, branch `main`). The owner edits them from the app's "My profile & CV" button.
-   Attach that repo with add_repo (access "read") and clone it. **Never copy CV text into this public repo,
-   commit messages or suggestions.** Use it only to judge matches and to write the short `why` lines.
-   If `profile.md` is missing there, fall back to this repo's `data/profile.md`. If the private repo can't be
-   reached, use `data/profile.md` and say so in the final summary. The CV wins for skills and topics; the profile
-   wins for preferences (countries, position types, exclusions).
+1. Read the candidate's **CV (`data/cv.md`) and search profile (`data/profile.md`)**. The owner edits both from
+   the app's "My profile & CV" button. The CV wins for skills and topics; the profile wins for preferences
+   (countries, position types, exclusions). If `data/cv.md` is missing or empty, use the profile alone.
    Also read `data/SOURCES.md` (all websites to search) and `data/suggestions.json` (what is already listed).
 2. Search the web for **currently open** calls that match the profile. The full list of websites is in
    [`SOURCES.md`](SOURCES.md). On every run: search **every ★ source** in SOURCES.md, plus that weekday's rotation

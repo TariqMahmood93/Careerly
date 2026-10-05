@@ -265,7 +265,7 @@
   </dialog>
 
 
-  <!-- Profile & CV (stored in the private careerly-private repo) -->
+  <!-- Profile & CV (saved as data/profile.md and data/cv.md in this repository) -->
   <dialog id="profile-dialog">
     <form id="profile-form">
       <div class="dialog-head">
@@ -273,47 +273,46 @@
         <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
       </div>
       <div class="dialog-body">
-        <p class="muted" style="margin:0 0 12px">Every morning the daily search reads your CV and this profile to find matching positions.
-          They're saved in your <strong>private</strong> repository <strong>careerly-private</strong>, never on this public site.</p>
+        <p class="muted" style="margin:0 0 12px">Every morning the daily search reads your CV and this profile to pick positions for you.
+          Edit them here any time; changes apply from the next search.</p>
 
-        <fieldset id="token-fieldset">
-          <legend>Connect to your private repository</legend>
-          <div id="token-saved" class="muted" hidden>🔒 Connected. A GitHub token is saved in this browser.
-            <button type="button" class="btn small" id="btn-forget-token">Forget it</button></div>
+        <fieldset>
+          <legend>1. Your CV</legend>
+          <div class="cv-upload">
+            <label class="btn">📄 Upload CV (PDF or .txt)
+              <input type="file" id="cv-file" accept=".pdf,application/pdf,.txt,.md,text/plain" hidden>
+            </label>
+            <span id="cv-file-name" class="muted"></span>
+          </div>
+          <label class="check"><input type="checkbox" id="cv-redact" checked> Remove email addresses and phone numbers (yours and your referees')</label>
+          <p class="muted" style="margin:0 0 6px">Only the text is saved (not the PDF), in <code>data/cv.md</code> of your public GitHub repository, so anyone can view it.
+            Check the text and fix anything that came out wrong.</p>
+          <textarea id="cv-text" rows="10" placeholder="Upload a CV, or paste its text here…"></textarea>
+        </fieldset>
+
+        <fieldset>
+          <legend>2. What to search for</legend>
+          <p class="muted" style="margin:0 0 6px">Your research topics, keywords, countries, position types and anything to exclude.
+            Lines starting with <code>-</code> are list items.</p>
+          <textarea id="profile-text" rows="16" spellcheck="false" class="mono"></textarea>
+        </fieldset>
+
+        <fieldset>
+          <legend>3. Permission to save</legend>
+          <div id="token-saved" class="muted" hidden>✅ This browser can save to GitHub.
+            <button type="button" class="btn small" id="btn-forget-token">Forget token</button></div>
           <div id="token-row">
-            <p class="muted" style="margin:0 0 6px">You do this once per device:</p>
+            <p class="muted" style="margin:0 0 6px">The site needs a GitHub token to save. Do this once per device:</p>
             <ol class="muted steps">
               <li>Open <a id="token-help-link" target="_blank" rel="noopener">GitHub → new fine-grained token</a>.</li>
               <li>Name it "Careerly", pick an expiration, and under <em>Repository access</em> choose
-                <strong>Only select repositories → careerly-private</strong>.</li>
+                <strong>Only select repositories → Careerly</strong>.</li>
               <li>Under <em>Permissions → Repository permissions</em>, set <strong>Contents</strong> to <strong>Read and write</strong>.</li>
-              <li>Click <em>Generate token</em>, copy it, paste it below and press <strong>Connect</strong>.</li>
+              <li>Click <em>Generate token</em>, copy it and paste it here. It's kept only in this browser.</li>
             </ol>
             <input type="password" id="gh-token" placeholder="github_pat_…" autocomplete="off">
           </div>
         </fieldset>
-
-        <div id="profile-fields" hidden>
-          <fieldset>
-            <legend>1. Your CV</legend>
-            <div class="cv-upload">
-              <label class="btn">📄 Upload CV (PDF or .txt)
-                <input type="file" id="cv-file" accept=".pdf,application/pdf,.txt,.md,text/plain" hidden>
-              </label>
-              <span id="cv-file-name" class="muted"></span>
-            </div>
-            <label class="check"><input type="checkbox" id="cv-redact" checked> Remove email addresses and phone numbers (the search doesn't need them)</label>
-            <p class="muted" style="margin:0 0 6px">Only the text is saved, not the PDF. Check it and fix anything that came out wrong.</p>
-            <textarea id="cv-text" rows="10" placeholder="Upload a CV, or paste its text here…"></textarea>
-          </fieldset>
-
-          <fieldset>
-            <legend>2. What to search for</legend>
-            <p class="muted" style="margin:0 0 6px">Your research topics, keywords, countries, position types and anything to exclude.
-              Lines starting with <code>-</code> are list items.</p>
-            <textarea id="profile-text" rows="16" spellcheck="false" class="mono"></textarea>
-          </fieldset>
-        </div>
         <p id="profile-status" class="profile-status"></p>
       </div>
       <div class="dialog-foot">

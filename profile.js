@@ -1,23 +1,25 @@
 /* Careerly: "My profile & CV" dialog.
- * Lets you upload your CV (PDF or text) and edit the search profile. Both are saved as
- * profile.md and cv.md in a PRIVATE repository (careerly-private), so the CV is never
- * published with this public site. The daily search reads them from there.
- * Reading and writing the private repo needs a fine-grained GitHub token, stored only
- * in this browser.
+ * Lets you upload your CV (PDF or text) and edit the search profile. Both are saved in this
+ * site's repository as data/cv.md and data/profile.md, and the daily search reads them.
+ * Anyone can view them; saving needs a fine-grained GitHub token, stored only in this browser.
  */
 (() => {
   'use strict';
 
   const TOKEN_KEY = 'careerly.githubToken.v1';
   const BRANCH = 'main';
-  const PROFILE_PATH = 'profile.md';
-  const CV_PATH = 'cv.md';
-  const PUBLIC_PROFILE_PATH = 'data/profile.md'; // starting point if the private repo has no profile yet
+  const PROFILE_PATH = 'data/profile.md';
+  const CV_PATH = 'data/cv.md';
   const CV_HEADER = '# CV (uploaded from the Careerly app)\n\n';
 
-  // Private repo next to this site's repo: <owner>/careerly-private
-  const OWNER = location.hostname.endsWith('.github.io') ? location.hostname.split('.')[0] : 'TariqMahmood93';
-  const REPO = { owner: OWNER, repo: 'careerly-private' };
+  // This site's own repository (owner.github.io/<repo>), with a fallback for local use
+  const REPO = (() => {
+    const h = location.hostname;
+    const first = location.pathname.split('/').filter(Boolean)[0];
+    return h.endsWith('.github.io') && first
+      ? { owner: h.split('.')[0], repo: first }
+      : { owner: 'TariqMahmood93', repo: 'Careerly' };
+  })();
 
   const $ = sel => document.querySelector(sel);
   const dlg = $('#profile-dialog');
@@ -74,21 +76,14 @@
   }
 
   // ---------- load current files ----------
-  // Returns file text, '' if it doesn't exist yet, or throws on access problems.
-  async function readPrivate(path) {
-    const res = await gh(path);
-    if (res.ok) return b64decode((await res.json()).content);
-    if (res.status === 404) {
-      // 404 is also what GitHub returns for a private repo the token can't see; check the repo itself.
-      const repo = await gh('', { url: `https://api.github.com/repos/${REPO.owner}/${REPO.repo}` });
-      if (repo.ok) return '';
-    }
-    throw apiError(res.status);
-  }
-
-  async function readPublicProfile() {
+  // Latest version from GitHub (the published site can lag a minute behind); '' if missing.
+  async function readFile(path) {
     try {
-      const res = await fetch(`${PUBLIC_PROFILE_PATH}?t=${Date.now()}`, { cache: 'no-store' });
+      const res = await gh(path);
+      if (res.ok) return b64decode((await res.json()).content);
+    } catch { /* offline or API limit: fall back to the published copy */ }
+    try {
+      const res = await fetch(`${path}?t=${Date.now()}`, { cache: 'no-store' });
       return res.ok ? await res.text() : '';
     } catch {
       return '';
@@ -103,26 +98,16 @@
     const has = !!getToken();
     $('#token-row').hidden = has;
     $('#token-saved').hidden = !has;
-    $('#profile-fields').hidden = !has;
-    $('#btn-profile-save').textContent = has ? 'Save profile & CV' : 'Connect';
   }
 
   async function loadFiles() {
-    setStatus('Loading your private profile…');
-    $('#profile-text').value = '';
-    $('#cv-text').value = '';
-    try {
-      const [profile, cv] = await Promise.all([readPrivate(PROFILE_PATH), readPrivate(CV_PATH)]);
-      original = { profile, cv: stripCvHeader(cv).trim() };
-      $('#profile-text').value = profile || await readPublicProfile();
-      $('#cv-text').value = original.cv;
-      $('#cv-file-name').textContent = original.cv ? 'A CV is saved. Upload a new file to replace it.' : 'No CV saved yet.';
-      setStatus('');
-      return true;
-    } catch (err) {
-      setStatus(err.message, 'error');
-      return false;
-    }
+    setStatus('Loading your profile…');
+    const [profile, cv] = await Promise.all([readFile(PROFILE_PATH), readFile(CV_PATH)]);
+    original = { profile, cv: stripCvHeader(cv).trim() };
+    $('#profile-text').value = profile;
+    $('#cv-text').value = original.cv;
+    $('#cv-file-name').textContent = original.cv ? 'A CV is saved. Upload a new file to replace it.' : 'No CV saved yet.';
+    setStatus('');
   }
 
   async function openDialog() {
@@ -130,7 +115,7 @@
     setStatus('');
     showTokenState();
     dlg.showModal();
-    if (getToken()) await loadFiles();
+    await loadFiles();
   }
 
   // ---------- CV upload ----------
@@ -223,7 +208,7 @@
 
   function apiError(status) {
     if (status === 401) return new Error('GitHub rejected the token (expired or mistyped). Use "Forget it" and add a new one.');
-    if (status === 403 || status === 404) return new Error(`The token can't access ${REPO.owner}/${REPO.repo}. Check that the private repo exists and the token has "Contents: Read and write" on it.`);
+    if (status === 403 || status === 404) return new Error(`The token can't write to ${REPO.owner}/${REPO.repo}. Give it "Contents: Read and write" access to that repository.`);
     if (status === 409) return new Error('The file changed on GitHub at the same time. Please try again.');
     return new Error(`GitHub error ${status}. Please try again.`);
   }
@@ -231,17 +216,14 @@
   $('#profile-form').addEventListener('submit', async e => {
     e.preventDefault();
 
-    // Step 1: connect (save the token, then load the private files)
     if (!getToken()) {
       const typed = $('#gh-token').value.trim();
-      if (!typed) { setStatus('Paste your GitHub token first.', 'error'); $('#gh-token').focus(); return; }
-      try { localStorage.setItem(TOKEN_KEY, typed); } catch { /* ignore */ }
-      showTokenState();
-      if (!(await loadFiles())) {
-        try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
-        showTokenState();
+      if (!typed) {
+        setStatus('To save, paste a GitHub token in the box below (one-time per device).', 'error');
+        $('#gh-token').focus();
+        return;
       }
-      return;
+      try { localStorage.setItem(TOKEN_KEY, typed); } catch { /* ignore */ }
     }
 
     // Step 2: save changed files
@@ -259,10 +241,12 @@
     try {
       for (const [path, content, msg] of changes) await putFile(path, content, msg);
       original = { profile, cv };
-      setStatus('Saved privately. The next daily search will use your updated CV and profile.', 'ok');
+      showTokenState();
+      setStatus('Saved. The next daily search will use your updated CV and profile.', 'ok');
       toast('Profile saved. Your next search will use it.');
       setTimeout(() => dlg.close(), 1500);
     } catch (err) {
+      if (/token/.test(err.message)) { try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ } showTokenState(); }
       setStatus(err.message, 'error');
     } finally {
       btn.disabled = false;
@@ -270,7 +254,6 @@
   });
 
   $('#btn-profile').addEventListener('click', openDialog);
-  dlg.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => dlg.close()));
   $('#token-help-link').href =
     'https://github.com/settings/personal-access-tokens/new';
 })();
