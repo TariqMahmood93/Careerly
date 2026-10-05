@@ -12,7 +12,7 @@
 
   const URL = 'data/positions.json';
   const PREFS_KEY = 'careerly.browse.v1';
-  const PAGE = 40;
+  const PAGE = 10;
   const C = window.Careerly;
   const { esc, fmtDate, daysFromToday, todayISO } = C;
   const $ = sel => document.querySelector(sel);
@@ -321,7 +321,7 @@
   $('#br-sort').addEventListener('change', e => { prefs.sort = e.target.value; rerender(); });
   $('#br-relevant').addEventListener('change', e => { prefs.relevant = e.target.checked; rerender(); });
   $('#br-search').addEventListener('input', e => { prefs.q = e.target.value; rerender(); });
-  $('#br-more').addEventListener('click', () => { shown += PAGE * 2; render(); });
+  $('#br-more').addEventListener('click', () => { shown += PAGE; render(); });
   $('#br-list').addEventListener('click', e => {
     const id = e.target.dataset.add;
     if (id) add(id);
