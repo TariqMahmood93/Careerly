@@ -9,6 +9,7 @@
   const META_KEY = 'careerly.meta.v1';
   const DISMISSED_KEY = 'careerly.dismissed.v1';
   const SUGGESTIONS_URL = 'data/suggestions.json';
+  const SUGG_COUNTRY_KEY = 'careerly.suggCountry.v1';
   const DAY = 24 * 60 * 60 * 1000;
   const NO_RESPONSE_DAYS = 60;
   const DEADLINE_WARN_DAYS = 7;
@@ -75,6 +76,10 @@
     } catch {
       return fallback;
     }
+  }
+
+  function loadText(key) {
+    try { return localStorage.getItem(key) || ''; } catch { return ''; }
   }
 
   function persist() {
@@ -303,13 +308,26 @@
 
   function renderSuggestions() {
     const box = $('#suggestions');
-    const list = pendingSuggestions();
     if (!suggestions.length) { box.hidden = true; return; }
     box.hidden = false;
+    const all = pendingSuggestions();
+
+    // Country dropdown: only countries with open positions, busiest first
+    const counts = {};
+    all.forEach(x => { const c = x.country || 'Other'; counts[c] = (counts[c] || 0) + 1; });
+    const countries = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+    const sel = $('#sugg-country');
+    let chosen = sel.value || loadText(SUGG_COUNTRY_KEY);
+    if (chosen && !counts[chosen]) chosen = '';
+    sel.innerHTML = `<option value="">🌍 All countries (${all.length})</option>` +
+      countries.map(c => `<option value="${esc(c)}">${esc(c)} (${counts[c]})</option>`).join('');
+    sel.value = chosen;
+    const list = chosen ? all.filter(x => (x.country || 'Other') === chosen) : all;
+
     const today = todayISO();
     const newToday = list.filter(x => x.foundOn === today).length;
     $('#sugg-summary').innerHTML =
-      `${list.length} to review${newToday ? ` · <strong>${newToday} new today</strong>` : ''}` +
+      `${list.length} to review${chosen ? ` in ${esc(chosen)}` : ''}${newToday ? ` · <strong>${newToday} new today</strong>` : ''}` +
       (suggestionsUpdated ? ` · last search ${esc(new Date(suggestionsUpdated).toLocaleString())}` : '');
     $('#sugg-list').innerHTML = list.length ? list.map(x => {
       const loc = [x.city, x.country].filter(Boolean).join(', ');
@@ -337,7 +355,7 @@
           <button class="btn small primary" data-accept="${esc(x.id)}">+ Add to tracker</button>
         </div>
       </article>`;
-    }).join('') : '<p class="empty">All caught up — nothing new to review.</p>';
+    }).join('') : `<p class="empty">${chosen ? `No open positions in ${esc(chosen)} right now.` : 'All caught up — nothing new to review.'}</p>`;
     $('#btn-restore-dismissed').hidden = dismissed.size === 0;
   }
 
@@ -656,6 +674,13 @@
   $('#btn-restore-dismissed').addEventListener('click', () => {
     dismissed = new Set();
     localStorage.setItem(DISMISSED_KEY, '[]');
+    renderSuggestions();
+  });
+  $('#sugg-country').addEventListener('change', e => {
+    try { localStorage.setItem(SUGG_COUNTRY_KEY, e.target.value); } catch { /* ignore */ }
+    const list = $('#sugg-list');
+    list.hidden = false;
+    $('#btn-toggle-sugg').textContent = 'Hide';
     renderSuggestions();
   });
   $('#btn-toggle-sugg').addEventListener('click', () => {
