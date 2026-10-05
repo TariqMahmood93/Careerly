@@ -3,9 +3,11 @@
 Each morning a scheduled Claude session follows these steps to fill the "New positions found for you"
 inbox in the Careerly app.
 
-1. Read `data/profile.md` (the candidate profile) and `data/suggestions.json` (what is already listed).
-2. Search the web for **currently open** calls that match the profile. Cover **every source group below
-   on every run**, at least 4 queries per group and at least 20 queries in total. When a source's pages can't be
+1. Read `data/profile.md` (the candidate profile), `data/SOURCES.md` (all websites to search) and
+   `data/suggestions.json` (what is already listed).
+2. Search the web for **currently open** calls that match the profile. The full list of websites is in
+   [`SOURCES.md`](SOURCES.md). On every run: search **every ★ source** in SOURCES.md, plus that weekday's rotation
+   groups. Make sure groups A–C below always get at least 4 queries each. Aim for **40+ queries in total**. When a source's pages can't be
    opened (network policy), use WebSearch with `allowed_domains` set to that site. That still returns its listings.
 
    **A. Italy: Bandi MUR (bandi.mur.gov.it).** Required every day. Use `allowed_domains: ["bandi.mur.gov.it"]`
