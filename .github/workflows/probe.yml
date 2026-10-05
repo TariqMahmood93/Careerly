@@ -3,39 +3,25 @@ name: Probe job sites (temporary)
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Fetch sample pages
+      - name: Try EURAXESS URL variants
         run: |
-          mkdir -p probe
           UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
-          fetch() { curl -sSL -A "$UA" --max-time 40 -o "probe/$1" -w "$1 %{http_code} %{size_download} %{url_effective}\n" "$2" || echo "$1 FAILED"; }
-          fetch euraxess_search.html 'https://euraxess.ec.europa.eu/jobs/search?keywords=machine%20learning'
-          fetch euraxess_search_p2.html 'https://euraxess.ec.europa.eu/jobs/search?keywords=machine%20learning&page=1'
-          fetch euraxess_job.html 'https://euraxess.ec.europa.eu/jobs/144969'
-          fetch mur_postdoc.html 'https://bandi.mur.gov.it/incarichipostdoc.php/public/cercaFellowship?jf_comp_status_id=2-3&bb_type_code=%25&idgsd24=%25&azione=cerca'
-          fetch mur_ricerca.html 'https://bandi.mur.gov.it/incarichidiricerca.php/public/cercaFellowship?jf_comp_status_id=2-3&bb_type_code=%25&azione=cerca'
-          fetch mur_assegni.html 'https://bandi.mur.gov.it/bandi.php/public/cercaFellowship?jf_comp_status_id=2-3&bb_type_code=%25&azione=cerca'
-          fetch mur_jobs.html 'https://bandi.mur.gov.it/jobs.php/public/cercaJobs?jv_comp_status_id=2-3&bb_type_code=%25&azione=cerca'
-          fetch mur_home.html 'https://bandi.mur.gov.it/'
-          fetch mur_detail.html 'https://bandi.mur.gov.it/bandi.php/public/fellowship/id_fellow/264839'
-          fetch jobsacuk_search.html 'https://www.jobs.ac.uk/search/?keywords=machine+learning'
-          fetch jobsacuk_rss1.xml 'https://www.jobs.ac.uk/feeds/subject-areas/computer-sciences'
-          fetch jobsacuk_rss2.xml 'https://www.jobs.ac.uk/search/?keywords=machine+learning&format=rss'
-          fetch ap_ml.html 'https://academicpositions.com/jobs/position/post-doc/field/machine-learning'
-          ls -la probe
-      - name: Save to probe branch
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-          git checkout --orphan probe
-          git rm -rq --cached . || true
-          git add probe
-          git commit -qm "Probe pages"
-          git push -f origin probe
+          try() {
+            ids=$(curl -sSL -A "$UA" -H "Accept-Language: en" --max-time 40 "$1" | grep -o 'href="/jobs/[0-9]*"' | grep -o '[0-9]*' | head -10 | tr '\n' ' ')
+            echo "$1 => $ids"
+          }
+          try 'https://euraxess.ec.europa.eu/jobs/search'
+          try 'https://euraxess.ec.europa.eu/jobs/search?page=1'
+          try 'https://euraxess.ec.europa.eu/jobs/search?page=3'
+          try 'https://euraxess.ec.europa.eu/jobs/search?f%5B0%5D=job_research_field%3A78'
+          try 'https://euraxess.ec.europa.eu/jobs/search?f%5B0%5D=job_research_field%3A78&page=1'
+          try 'https://euraxess.ec.europa.eu/jobs/search?keywords=machine%20learning&f%5B0%5D=job_research_field%3A78'
+          try 'https://euraxess.ec.europa.eu/jobs/search?keys=machine%20learning'
+          try 'https://euraxess.ec.europa.eu/jobs/search?search_api_fulltext=machine%20learning'
+          try 'https://euraxess.ec.europa.eu/jobs/search?keywords=deep%20learning'
+          try 'https://euraxess.ec.europa.eu/jobs/search?keywords=deep%20learning&page=2'
+          curl -sSL -A "$UA" --max-time 40 'https://euraxess.ec.europa.eu/jobs/search?f%5B0%5D=job_research_field%3A78' | grep -o 'Filter by [^"]*' | sort | uniq -c | sort -rn | head -40
