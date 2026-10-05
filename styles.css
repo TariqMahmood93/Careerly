@@ -230,6 +230,19 @@ legend { font-weight: 600; padding: 0 6px; }
 .docs-list .rm { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 2px; }
 .add-doc { display: flex; gap: 6px; max-width: 360px; }
 
+/* Profile dialog */
+.cv-upload { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.cv-upload .btn { display: inline-block; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 6px 0; }
+.check input { width: auto; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+.steps { margin: 0 0 8px; padding-left: 20px; font-size: 13px; }
+.profile-status { margin: 0; font-size: 14px; min-height: 1.4em; }
+.profile-status.ok { color: #16a34a; }
+.profile-status.error { color: var(--danger); }
+code { background: var(--surface-2); padding: 0 4px; border-radius: 4px; }
+#btn-profile-save:disabled { opacity: .6; cursor: wait; }
+
 /* Detail view */
 .detail-section { margin-bottom: 18px; }
 .detail-section h4 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }

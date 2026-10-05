@@ -24,7 +24,9 @@ calls that match the profile in [`data/profile.md`](data/profile.md). It checks 
 [`data/suggestions.json`](data/suggestions.json) on `main`. When you open the app, they appear at the top under
 **New positions found for you**, where you can **+ Add to tracker** or **Dismiss** each one.
 
-- Edit `data/profile.md` to change what it looks for. The search steps are in
+- Click **👤 My profile & CV** in the app to upload your CV (PDF) and edit what it looks for. Both are saved in your
+  **private** repo `careerly-private`, never in this public one. The first time on each device you paste a GitHub token
+  (the app shows the steps). `data/profile.md` here is only a fallback. The search steps are in
   [`data/SEARCH_INSTRUCTIONS.md`](data/SEARCH_INSTRUCTIONS.md).
 - The inbox only works when the app is online (GitHub Pages, see below). It doesn't show when you open `index.html` as a local file.
 - Always check the original call before applying. Details are collected automatically and can be incomplete.
