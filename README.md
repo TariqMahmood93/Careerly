@@ -47,10 +47,36 @@ see only those. Use **+ Track** to add one to your applications.
 - The inbox only works when the app is online (GitHub Pages, see below). It doesn't show when you open `index.html` as a local file.
 - Always check the original call before applying. Details are collected automatically and can be incomplete.
 
+## 📝 Cover letters and required documents
+
+Open a tracked position and use:
+
+- **📝 Cover letter**: drafts a cover letter for that call from your CV (upload it once; PDF, Word or text).
+  The draft names the call's topics that your CV covers, quotes the CV lines that support them best, and leaves
+  yellow **[brackets]** for what only you can write. Edit it in the app or download it as a **Word file (.docx)**,
+  which opens in Word, Google Docs and LibreOffice. Page 2 of the file has preparation notes: the deadline with time,
+  how to submit, the documents checklist and the call's topics your CV doesn't mention. Delete it before sending.
+  Your edits are saved with the position.
+- **🔍 Check the call**: paste the call text (the job ad, or the bando's "Domanda di ammissione" section). Careerly
+  finds the documents it asks for (CV, motivation letter, research proposal, reference letters and how many, PhD
+  certificate, ID copy, DSAN self-declaration, publication list, Europass, and more, in English and Italian) and adds
+  them to the checklist. It also reads the deadline time ("ore 13:00") and flags special requirements: PEC, signatures,
+  a single PDF, page limits. Tick documents off directly in the position view.
+
+## ⏰ Deadlines with a time, expired calls removed
+
+A deadline can have a time of day (e.g. **5 Oct 2026, 13:00 (Rome time)**). The collector reads it from EURAXESS and
+Bandi MUR when the listing gives one; you can also set it in the form or with *Check the call*. Without a time, a call
+closes at the end of its deadline day. Calls disappear from *All open positions* as soon as they close. In your
+tracker, positions you **hadn't applied to** are removed automatically once their deadline passes (with Undo).
+Positions you applied to stay, since they are waiting for an answer.
+
 ## Helpful extras
 
 - **Dashboard**: counts per status. Click a tile to filter.
-- **Alerts**: deadlines in the next 7 days, deadlines passed while still "to apply", and applications with no news for 60+ days (time to follow up or mark them "No response").
+- **📅 Next deadlines**: the five nearest deadlines of applications not sent yet, with time left and how many documents are ready.
+- **Alerts**: applications with no news for 60+ days (time to follow up or mark them "No response").
+- **No duplicates**: a call found both by Claude's daily search and by the collector is shown once, as the ⭐ Claude pick.
 - **Search, filter and sort** by status, country, position type, deadline or date applied.
 - **Quick status change** from each card.
 - **One-click email**: the application email opens your mail client with the required subject line already filled in.
@@ -63,16 +89,8 @@ your *Match to my CV* profile are saved in your account, a private Supabase data
 their own data. Log in on any laptop, phone or incognito window to see them. Anything you tracked before signing up
 is added to your account. Logging out clears this browser's copy, but your data stays safe in your account.
 
-Without an account the app works as before, storing everything in this browser only.
-
-## ⚠️ About your data (without an account)
-
-Everything is saved in your browser's local storage, on your own device only. That means:
-
-- Clearing browser data, or using a different browser or computer, will **not** show your entries.
-- Use **Backup → Export backup (.json)** regularly. The app reminds you every 14 days.
-  Keep the file somewhere safe (Google Drive, Dropbox, email it to yourself).
-- To move to another computer, export there and **import** the file on the new one. Imports merge and never delete existing entries.
+Your CV text (used for matching and cover letters) is kept in the same private row. **Backup → Export** still gives
+you a `.json` or `.csv` copy whenever you want one.
 
 ## How to use it
 
@@ -84,10 +102,10 @@ Everything is saved in your browser's local storage, on your own device only. Th
 2. In the repo, go to **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
 3. The included workflow deploys the site. It will be at `https://<your-username>.github.io/Careerly/`.
 
-Note: each browser or device still keeps its own data. Use export/import to sync between them.
 
 ## Files
 
 - `index.html`: page layout and forms
 - `styles.css`: styling (light and dark mode, mobile friendly)
-- `app.js`: all the logic (storage, alerts, filters, backup)
+- `app.js`: the tracker (storage, deadlines, alerts, filters, backup)
+- `letter.js`: cover-letter drafts (.docx) and the required-documents check

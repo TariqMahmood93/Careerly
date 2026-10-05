@@ -86,7 +86,7 @@
             <option value="match">Sort: best match</option>
             <option value="newest">Sort: newest first</option>
           </select>
-          <label class="btn small" id="match-upload-label" title="Rank all positions against your own CV. It stays in your browser.">📄 Match to my CV <input type="file" id="match-file" accept=".pdf,application/pdf,.txt,.md,text/plain" hidden></label>
+          <label class="btn small" id="match-upload-label" title="Rank all positions against your own CV. It stays in your browser.">📄 Match to my CV <input type="file" id="match-file" accept=".pdf,application/pdf,.docx,.txt,.md,text/plain" hidden></label>
           <button type="button" class="btn small" id="match-clear" title="Forget my CV and use the default ranking" hidden>✕ Stop matching my CV</button>
           <label class="check br-rel" id="br-rel-label"><input type="checkbox" id="br-relevant" checked> Only matching the profile</label>
         </div>
@@ -168,7 +168,11 @@
           <legend>Key dates &amp; conditions</legend>
           <div class="grid">
             <label>Application deadline
-              <input name="deadline" type="date">
+              <span class="date-time">
+                <input name="deadline" type="date">
+                <input name="deadlineTime" type="time" title="Time of day, if the call states one (e.g. 13:00). Empty = end of the day.">
+              </span>
+              <small class="muted">Time is optional; leave it empty if the call gives none. Calls you haven't applied to are removed once the deadline passes.</small>
             </label>
             <label>Expected start date
               <input name="startDate" type="text" placeholder="e.g. Jan 2027 / negotiable">
@@ -279,11 +283,74 @@
     <div class="dialog-foot">
       <button type="button" class="btn danger" id="btn-detail-delete">🗑 Delete</button>
       <span class="spacer"></span>
+      <button type="button" class="btn" id="btn-letter" title="Draft a cover letter for this call from your CV, as a Word file">📝 Cover letter</button>
       <button type="button" class="btn" data-close>Close</button>
       <button type="button" class="btn primary" id="btn-detail-edit">Edit</button>
     </div>
   </dialog>
 
+
+  <!-- Cover letter draft (letter.js) -->
+  <dialog id="letter-dialog" class="wide">
+    <div class="dialog-head">
+      <h2>📝 Cover letter draft</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="dialog-body">
+      <p class="muted" id="letter-for"></p>
+      <p class="muted">A first draft built from the call and your CV. Text in <mark>[brackets]</mark> is for you to fill in, and everything
+        should be checked before sending. Download it as a Word file (.docx) to edit; it also opens in Google Docs and LibreOffice.
+        A second page lists what to prepare (documents, deadline, how to submit); delete it before sending.</p>
+      <div id="letter-cv" class="letter-cv" hidden>
+        <p><strong>First, add your CV</strong> (PDF, Word or text). It is read here in your browser and kept in your account,
+          so the letter can mention your own experience. It is also used to match open positions to you.</p>
+        <label class="btn primary file-btn">📄 Choose my CV<input type="file" id="letter-cv-file" accept=".pdf,.docx,.txt,.md" hidden></label>
+        <span id="letter-cv-status" class="muted"></span>
+      </div>
+      <div id="letter-main" hidden>
+        <details id="letter-me">
+          <summary>Your details for the letter head <span class="muted">(read from your CV; check them)</span></summary>
+          <div class="grid">
+            <label>Full name <input id="lt-name"></label>
+            <label>Email <input id="lt-email" type="email"></label>
+            <label>Phone <input id="lt-phone"></label>
+            <label>Current position <input id="lt-role" placeholder="e.g. Postdoctoral Researcher at the University of Calabria"></label>
+          </div>
+        </details>
+        <div id="letter-insights" class="letter-insights"></div>
+        <label class="letter-text-label">Letter text <small class="muted">(you can edit here or in Word)</small>
+          <textarea id="letter-text" rows="18" spellcheck="true"></textarea>
+        </label>
+      </div>
+    </div>
+    <div class="dialog-foot">
+      <button type="button" class="btn" id="letter-regen" title="Rebuild the draft from the call and your CV (your edits here are lost)">↻ Rebuild draft</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="letter-copy">Copy text</button>
+      <button type="button" class="btn primary" id="letter-download">⬇ Download .docx</button>
+    </div>
+  </dialog>
+
+  <!-- Required-documents check (letter.js) -->
+  <dialog id="docs-dialog" class="wide">
+    <div class="dialog-head">
+      <h2>🔍 Check the call for required documents</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="dialog-body">
+      <p class="muted">Paste the call text: the job ad, or the bando's section on how to apply ("Domanda di ammissione",
+        "Documentazione da allegare"). Careerly finds the documents it asks for, the deadline time, and special
+        requirements (PEC, signatures, page limits), and adds them to this position. What we already know about the call is checked too.</p>
+      <textarea id="docs-text" rows="10" placeholder="Paste the call text here…"></textarea>
+      <div class="docs-actions"><button type="button" class="btn primary" id="docs-run">Check</button>
+        <a id="docs-open-call" target="_blank" rel="noopener" hidden>Open the call ↗</a></div>
+      <div id="docs-result"></div>
+    </div>
+    <div class="dialog-foot">
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>Done</button>
+    </div>
+  </dialog>
 
   <!-- Profile & CV (saved as data/profile.md and data/cv.md in this repository) -->
   <dialog id="profile-dialog">
@@ -302,7 +369,7 @@
           <legend>1. Your CV</legend>
           <div class="cv-upload">
             <label class="btn">📄 Upload CV (PDF or .txt)
-              <input type="file" id="cv-file" accept=".pdf,application/pdf,.txt,.md,text/plain" hidden>
+              <input type="file" id="cv-file" accept=".pdf,application/pdf,.docx,.txt,.md,text/plain" hidden>
             </label>
             <span id="cv-file-name" class="muted"></span>
           </div>
@@ -378,6 +445,7 @@
   <script src="app.js?v=__VERSION__"></script>
   <script src="profile.js?v=__VERSION__"></script>
   <script src="positions.js?v=__VERSION__"></script>
+  <script src="letter.js?v=__VERSION__"></script>
   <script src="vendor/supabase/supabase.js?v=2.117.2"></script>
   <script src="cloud.js?v=__VERSION__"></script>
 </body>

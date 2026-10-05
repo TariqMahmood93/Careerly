@@ -3,9 +3,13 @@
  * (data/positions.json, built by scripts/fetch_positions.py in GitHub Actions),
  * with filters for country, source, type and relevance to the profile.
  *
- * Personal matching: any visitor can upload their own CV. Its text is read in the browser,
+ * Personal matching: any user can upload their own CV. Its text is read in the browser,
  * turned into weighted topic terms (rarer terms count more), and every position is re-scored
- * against them. The CV and terms are kept only in this browser's storage, never uploaded.
+ * against them. The CV text and terms are kept in this browser and in the user's own account
+ * (cloud.js), where the cover-letter drafts (letter.js) also use them.
+ *
+ * Expired calls (deadline date + time passed) are hidden, and a call found both by Claude's
+ * daily search and by the collector is shown once.
  */
 (() => {
   'use strict';
@@ -14,14 +18,14 @@
   const PREFS_KEY = 'careerly.browse.v1';
   const PAGE = 10;
   const C = window.Careerly;
-  const { esc, fmtDate, daysFromToday, todayISO } = C;
+  const { esc, daysFromToday, todayISO } = C;
   const $ = sel => document.querySelector(sel);
 
   let all = [];
   let meta = {};
   let shown = PAGE;
   const PERSONAL_KEY = 'careerly.personalMatch.v1';
-  let personal = null; // { name, terms: [{ t, w, custom? }], savedAt }
+  let personal = null; // { name, terms: [{ t, w, custom? }], cvText?, letter?, savedAt }
 
   // ---------- personal matching ----------
   const STOP = new Set(`a about above after again all also am an and any are as at be because been before being below
@@ -160,8 +164,9 @@
     return {
       id: `pick-${x.id}`, pick: true, source: 'Claude daily pick', origin: x.source || '',
       kind: x.type || '', type: x.type || '', title: x.title, titleAlt: '',
-      institution: [x.institution, x.pi].filter(Boolean).join(' · '),
+      institution: [x.institution, x.pi].filter(Boolean).join(' · '), inst: x.institution || '',
       country: x.country || '', city: x.city || '', deadline: x.deadline || '',
+      deadlineTime: x.deadlineTime || '', deadlineTz: x.deadlineTz || '',
       url: x.callUrl || x.applyUrl || '', applyUrl: x.applyUrl || '',
       field: x.keywords || '', summary: x.procedure || '', why: x.why || '',
       salary: x.salary || '', duration: x.duration || '',
@@ -179,15 +184,45 @@
     }
   }
 
+  // ---------- duplicates: the same call found by Claude's search and by the collector ----------
+  const GENERIC = new Set('studi degli della delle del di politecnico technical technology technische national nazionale sciences science scienze universitat universidad universidade college royal state free libera'.split(' '));
+  const sig = s => new Set(norm(s).trim().split(' ').filter(w => w.length > 2 && !STOP.has(w) && !GENERIC.has(w)));
+  function similarTitles(a, b) {
+    const A = sig(a), B = sig(b);
+    if (A.size < 3 || B.size < 3) return false;
+    let shared = 0;
+    for (const w of A) if (B.has(w)) shared++;
+    return shared / Math.min(A.size, B.size) >= 0.7;
+  }
+  function sameCall(pick, p) {
+    // only the call's own page counts: application portals (PICA, Titulus…) are shared by many calls
+    const urls = [pick.raw.callUrl, pick.raw.applyUrl].filter(Boolean);
+    if (urls.includes(p.url)) return true;
+    if (pick.country && p.country && pick.country !== p.country) return false;
+    const pi = sig(pick.inst || pick.institution), ci = sig(p.institution);
+    const sameInst = [...pi].some(w => ci.has(w));
+    return sameInst && (similarTitles(pick.title, p.title) || similarTitles(pick.title, p.titleAlt));
+  }
+
+  const open = p => !C.isExpired(p);
+
   async function load() {
     const [data, picks] = await Promise.all([getJson(URL), getJson('data/suggestions.json')]);
     if (!data && !picks) return; // no data yet, or opened as a local file
-    const open = p => !p.deadline || daysFromToday(p.deadline) >= 0;
     const pickList = ((picks && picks.suggestions) || []).filter(x => x && x.id && x.title).map(pickToPosition).filter(open);
-    const pickUrls = new Set(pickList.map(p => p.url).filter(Boolean));
-    // a call found both ways is shown once, as the Claude pick (it has the "why it matches" note)
-    const collected = ((data && data.positions) || []).filter(open).filter(p => !pickUrls.has(p.url));
-    all = [...pickList, ...collected];
+    // a call found both ways is shown once, as the Claude pick (it has the "why it matches" note),
+    // completed with what the collector knows (e.g. the exact deadline)
+    const collected = ((data && data.positions) || []).filter(open).filter(p => {
+      const pick = pickList.find(k => sameCall(k, p));
+      if (!pick) return true;
+      pick.alsoOn = p.source;
+      if (!pick.deadline && p.deadline) { pick.deadline = p.deadline; pick.deadlineTime = p.deadlineTime || ''; pick.deadlineTz = p.deadlineTz || ''; }
+      if (!pick.deadlineTime && p.deadlineTime && pick.deadline === p.deadline) { pick.deadlineTime = p.deadlineTime; pick.deadlineTz = p.deadlineTz || ''; }
+      if (!pick.applyUrl && p.applyUrl) pick.applyUrl = p.applyUrl;
+      if (!pick.extraText) pick.extraText = [p.title, p.titleAlt, p.field, p.summary].filter(Boolean).join('\n');
+      return false;
+    });
+    all = [...pickList, ...collected].filter(open);
     meta = { ...(data || {}), picksUpdatedAt: picks && picks.updatedAt };
     if (meta.sources && pickList.length) meta.sources = { 'Claude daily picks': { ok: true, count: pickList.length }, ...meta.sources };
     $('#browse').hidden = false;
@@ -235,19 +270,19 @@
 
     const far = '9999-12-31';
     const sorters = {
-      deadline: (a, b) => (a.deadline || far).localeCompare(b.deadline || far),
+      deadline: (a, b) => (a.deadline || far).localeCompare(b.deadline || far) || (C.deadlineAt(a) || 0) - (C.deadlineAt(b) || 0),
       newest: (a, b) => (b.firstSeen || '').localeCompare(a.firstSeen || '') || (scoreOf(b) - scoreOf(a)),
       match: (a, b) => scoreOf(b) - scoreOf(a) || (a.deadline || far).localeCompare(b.deadline || far),
     };
     return list.slice().sort(sorters[prefs.sort] || sorters.deadline);
   }
 
-  function deadlineChip(d) {
-    if (!d) return '<span class="chip">⏰ no deadline stated</span>';
-    const days = daysFromToday(d);
+  function deadlineChip(p) {
+    if (!p.deadline) return '<span class="chip">⏰ no deadline stated</span>';
+    const days = daysFromToday(p.deadline);
     const cls = days <= 3 ? 'overdue' : days <= 10 ? 'due-soon' : '';
-    const left = days === 0 ? ' (today!)' : days <= 10 ? ` (${days}d left)` : '';
-    return `<span class="chip ${cls}">⏰ ${esc(fmtDate(d))}${left}</span>`;
+    const left = days <= 10 ? C.timeLeft(p) : '';
+    return `<span class="chip ${cls}">⏰ ${esc(C.fmtDeadline(p))}${esc(left)}</span>`;
   }
 
   function render() {
@@ -276,9 +311,9 @@
           <div class="inst">${esc(p.institution || '')}</div>
           <div class="meta">
             ${loc ? `<span class="chip">📍 ${esc(loc)}</span>` : ''}
-            ${deadlineChip(p.deadline)}
+            ${deadlineChip(p)}
             ${p.stars ? `<span class="chip" title="Match with the owner's profile">${'★'.repeat(Math.min(5, p.stars))}</span>` : ''}
-            <span class="chip">🔎 ${esc(p.pick ? (p.origin || 'Claude search') : p.source)}</span>
+            <span class="chip">🔎 ${esc(p.pick ? (p.origin || 'Claude search') : p.source)}${p.alsoOn && p.alsoOn !== p.origin ? ` · also on ${esc(p.alsoOn)}` : ''}</span>
             ${p.kind || p.type ? `<span class="chip">${esc(p.kind || p.type)}</span>` : ''}
             ${hitsOf(p).slice(0, 4).map(m => `<span class="chip kw">${esc(m)}</span>`).join('')}
           </div>
@@ -305,12 +340,19 @@
   function add(id) {
     const p = all.find(x => x.id === id);
     if (!p) return;
-    if (p.pick) { C.add({ ...p.raw, source: p.origin || 'Claude daily pick' }, { sourceId: p.id, suggestionId: p.raw.id }); return; }
+    if (p.pick) {
+      C.add({ ...p.raw, source: p.origin || 'Claude daily pick', deadline: p.deadline, deadlineTime: p.deadlineTime,
+        deadlineTz: p.deadlineTz, applyUrl: p.raw.applyUrl || p.applyUrl,
+        callText: [p.raw.keywords, p.raw.procedure, p.extraText].filter(Boolean).join('\n') }, { sourceId: p.id, suggestionId: p.raw.id });
+      return;
+    }
     C.add({
       title: p.title, type: p.type, institution: p.institution, country: p.country, city: p.city,
-      callUrl: p.url, deadline: p.deadline, salary: p.salary, duration: p.duration,
+      callUrl: p.url, deadline: p.deadline, deadlineTime: p.deadlineTime, deadlineTz: p.deadlineTz,
+      salary: p.salary, duration: p.duration,
       applyUrl: p.applyUrl, keywords: hitsOf(p).join(', '), source: p.source,
       procedure: [p.titleAlt, p.summary].filter(Boolean).join('\n\n'),
+      callText: [p.title, p.titleAlt, p.field, p.summary].filter(Boolean).join('\n'),
       notes: p.kind ? `Position type at source: ${p.kind}` : '',
     }, { sourceId: p.id });
   }
@@ -354,7 +396,25 @@
       else { personal = next; savePersonal({ silent: true }); }
     },
     onChange: fn => personalListeners.push(fn),
+    importCV: file => importCV(file),
+    // keep extra fields (e.g. the letter-head details) in the synced profile
+    patch: fields => { if (!personal) return; Object.assign(personal, fields, { savedAt: Date.now() }); savePersonal(); },
+    terms: text => buildTerms(text),
+    norm,
+    isStop: w => STOP.has(w),
   };
+
+  // Read a CV file: builds the matching topics and keeps the text for cover letters
+  async function importCV(file) {
+    if (!window.CareerlyCV) throw new Error('The CV reader did not load. Please reload the page.');
+    const text = await window.CareerlyCV.extractText(file);
+    const terms = buildTerms(text);
+    if (terms.length < 3) throw new Error('Could not find enough research topics in this CV to match on.');
+    setPersonal({ name: file.name.replace(/\.[^.]+$/, ''), terms, cvText: text.slice(0, 40000),
+      letter: personal && personal.letter, savedAt: Date.now() },
+    `Found ${terms.length} topics in your CV. Remove any that don't fit, or add your own.`);
+    return personal;
+  }
 
   $('#match-file').addEventListener('change', async e => {
     const file = e.target.files[0];
@@ -363,12 +423,7 @@
     const status = $('#match-status');
     status.textContent = `Reading ${file.name}…`;
     try {
-      if (!window.CareerlyCV) throw new Error('The CV reader did not load. Please reload the page.');
-      const text = await window.CareerlyCV.extractText(file);
-      const terms = buildTerms(text);
-      if (terms.length < 3) throw new Error('Could not find enough research topics in this CV to match on.');
-      setPersonal({ name: file.name.replace(/\.[^.]+$/, ''), terms, savedAt: Date.now() },
-        `Found ${terms.length} topics in your CV. Remove any that don't fit, or add your own.`);
+      await importCV(file);
     } catch (err) {
       status.textContent = err.message;
     }
@@ -415,6 +470,12 @@
   }
   refreshIfChanged();
   setInterval(refreshIfChanged, 30 * 60 * 1000);
+  // hide calls as soon as their deadline (date and time) passes
+  setInterval(() => {
+    const n = all.length;
+    all = all.filter(open);
+    if (all.length !== n) render();
+  }, 5 * 60 * 1000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') refreshIfChanged();
   });

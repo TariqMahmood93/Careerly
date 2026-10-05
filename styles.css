@@ -349,3 +349,32 @@ body.locked main, body.locked .top-actions { display: none !important; }
 .auth-card { width: min(460px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
   padding: 24px; box-shadow: 0 10px 30px rgba(16, 24, 40, .08); }
 .auth-title { margin: 0 0 6px; font-size: 22px; }
+
+/* ---------- Deadlines, documents check, cover letter ---------- */
+.date-time { display: flex; gap: 6px; }
+.date-time input[type=time] { width: 8.5em; flex: none; }
+.upcoming { border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 10px; }
+.upcoming ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.upcoming li { font-size: 14px; }
+.upcoming a { cursor: pointer; }
+.docs-check { margin-top: 10px; }
+.docs-check-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.docs-check-head .btn { margin-left: auto; }
+.detail-docs label { cursor: pointer; }
+dialog.wide { width: min(900px, calc(100vw - 24px)); }
+#docs-text, #letter-text { width: 100%; font: inherit; font-size: 14px; line-height: 1.45; }
+.docs-actions { display: flex; align-items: center; gap: 12px; margin: 8px 0 12px; }
+#docs-result h4 { margin: 14px 0 6px; }
+.docs-found { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.typical { display: flex; flex-wrap: wrap; gap: 6px; }
+.letter-cv { border: 1px dashed var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; }
+.letter-insights { display: grid; gap: 6px; margin: 10px 0; font-size: 14px; }
+.letter-text-label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+#letter-me { margin-bottom: 6px; }
+#letter-me summary { cursor: pointer; }
+#letter-me .grid { margin-top: 8px; }
+mark { background: #fde68a; color: inherit; padding: 0 2px; border-radius: 3px; }
+@media (max-width: 640px) {
+  .grid { grid-template-columns: 1fr; }
+  .span-2 { grid-column: auto; }
+}

@@ -1,6 +1,5 @@
 /* Careerly — simple research-application tracker.
- * All data is stored in the browser (localStorage). Use Backup → Export
- * regularly so nothing is lost if browser data is cleared.
+ * Data is kept in the browser (localStorage) and synced to the signed-in account (cloud.js).
  */
 (() => {
   'use strict';
@@ -11,7 +10,7 @@
   const DAY = 24 * 60 * 60 * 1000;
   const NO_RESPONSE_DAYS = 60;
   const DEADLINE_WARN_DAYS = 7;
-  const BACKUP_REMIND_DAYS = 14;
+  const PURGE_EVERY_MS = 10 * 60 * 1000;
 
   const STATUSES = [
     { id: 'saved',        label: 'Saved / to apply',      color: '#64748b' },
@@ -116,6 +115,66 @@
     return Math.round((d - t) / DAY);
   }
 
+  // ---------- Deadlines with a time of day ----------
+  // A deadline is a date plus an optional time (HH:MM) in the call's time zone. Without a
+  // stated time it ends at 23:59 that day. Expired calls are removed automatically.
+  const COUNTRY_TZ = {
+    'United Kingdom': 'Europe/London', Ireland: 'Europe/Dublin', Portugal: 'Europe/Lisbon',
+    Iceland: 'Atlantic/Reykjavik', Finland: 'Europe/Helsinki', Estonia: 'Europe/Tallinn',
+    Latvia: 'Europe/Riga', Lithuania: 'Europe/Vilnius', Greece: 'Europe/Athens',
+    Romania: 'Europe/Bucharest', Bulgaria: 'Europe/Sofia', Cyprus: 'Asia/Nicosia',
+  };
+  const tzOf = p => p.deadlineTz || COUNTRY_TZ[p.country] || 'Europe/Rome';
+  const validTime = t => /^([01]?\d|2[0-3]):[0-5]\d$/.test(t || '');
+
+  function tzOffset(tz, t) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+      }).formatToParts(new Date(t));
+      const g = k => Number(parts.find(x => x.type === k).value);
+      return Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute')) - Math.floor(t / 60000) * 60000;
+    } catch {
+      return 0;
+    }
+  }
+
+  // The moment a deadline ends (ms since epoch), or null when there is no deadline
+  function deadlineAt(p) {
+    if (!p || !/^\d{4}-\d{2}-\d{2}$/.test(p.deadline || '')) return null;
+    const [y, m, d] = p.deadline.split('-').map(Number);
+    const [h, mi] = (validTime(p.deadlineTime) ? p.deadlineTime : '23:59').split(':').map(Number);
+    const local = Date.UTC(y, m - 1, d, h, mi, h === 23 && mi === 59 && !validTime(p.deadlineTime) ? 59 : 0);
+    const tz = tzOf(p);
+    const first = local - tzOffset(tz, local);
+    return local - tzOffset(tz, first);
+  }
+
+  const isExpired = p => { const t = deadlineAt(p); return t !== null && t < Date.now(); };
+
+  function tzLabel(tz) {
+    return (tz.split('/').pop() || tz).replace(/_/g, ' ') + ' time';
+  }
+
+  // "5 Oct 2026, 13:00 (Rome time)"
+  function fmtDeadline(p) {
+    if (!p.deadline) return '';
+    return fmtDate(p.deadline) + (validTime(p.deadlineTime) ? `, ${p.deadlineTime} (${tzLabel(tzOf(p))})` : '');
+  }
+
+  // " · 3 days left", " · today, 5h left", " · passed 2d ago"
+  function timeLeft(p) {
+    const t = deadlineAt(p);
+    if (t === null) return '';
+    const ms = t - Date.now();
+    if (ms < 0) { const d = Math.max(1, -daysFromToday(p.deadline)); return ` · passed ${d}d ago`; }
+    const days = daysFromToday(p.deadline);
+    if (ms < 36e5) return ` · ${Math.max(1, Math.round(ms / 6e4))} min left!`;
+    if (days <= 0 || ms < 24 * 36e5 && validTime(p.deadlineTime)) return ` · ${Math.round(ms / 36e5)}h left!`;
+    return ` · ${days} day${days === 1 ? '' : 's'} left`;
+  }
+
   function fmtDate(iso) {
     const d = parseDate(iso);
     return d ? d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
@@ -159,15 +218,11 @@
     }
     const days = daysFromToday(p.deadline);
     const open = NOT_SENT.has(p.status);
-    let cls = '', extra = '';
-    if (days < 0) { cls = open ? 'overdue' : ''; extra = ` · passed ${-days}d ago`; }
-    else if (days === 0) { cls = open ? 'overdue' : ''; extra = ' · today!'; }
-    else {
-      extra = ` · ${days} day${days === 1 ? '' : 's'} left`;
-      if (open && days <= DEADLINE_WARN_DAYS) cls = 'due-soon';
-    }
-    if (!full && !open) extra = '';
-    return `<span class="chip ${cls}">⏰ ${full ? 'Deadline: ' : ''}${esc(fmtDate(p.deadline))}${extra}</span>`;
+    let cls = '';
+    if (open && (days <= 0 || isExpired(p))) cls = 'overdue';
+    else if (open && days <= DEADLINE_WARN_DAYS) cls = 'due-soon';
+    const extra = !full && !open ? '' : timeLeft(p);
+    return `<span class="chip ${cls}">⏰ ${full ? 'Deadline: ' : ''}${esc(fmtDeadline(p))}${extra}</span>`;
   }
 
   function howToApplyShort(p) {
@@ -194,28 +249,26 @@
 
   function renderAlerts() {
     const out = [];
-    const soon = [], passed = [], stale = [];
+    const stale = [];
     positions.forEach(p => {
-      const d = daysFromToday(p.deadline);
-      if (NOT_SENT.has(p.status) && d !== null) {
-        if (d < 0) passed.push(p);
-        else if (d <= DEADLINE_WARN_DAYS) soon.push(p);
-      }
       if (WAITING.has(p.status) && p.appliedDate) {
         const lastContact = [p.appliedDate, p.followUpDate].filter(Boolean).sort().pop();
         if (-daysFromToday(lastContact) >= NO_RESPONSE_DAYS) stale.push(p);
       }
     });
     const link = p => `<a data-open="${p.id}">${esc(p.title)} — ${esc(p.institution)}</a>`;
-    if (soon.length) out.push(`<div class="alert"><strong>Deadlines within ${DEADLINE_WARN_DAYS} days:</strong> ${soon.map(link).join(', ')}</div>`);
-    if (passed.length) out.push(`<div class="alert"><strong>Deadline passed but not marked as applied:</strong> ${passed.map(link).join(', ')}</div>`);
-    if (stale.length) out.push(`<div class="alert"><strong>No news for ${NO_RESPONSE_DAYS}+ days</strong> (follow up or mark as “No response”): ${stale.map(link).join(', ')}</div>`);
-    if (positions.length) {
-      const since = meta.lastExport ? Math.floor((Date.now() - meta.lastExport) / DAY) : null;
-      if (since === null || since >= BACKUP_REMIND_DAYS) {
-        out.push(`<div class="alert"><strong>Backup reminder:</strong> your data lives only in this browser. ${since === null ? 'You have never exported a backup.' : `Last backup was ${since} days ago.`} Use <em>Backup → Export backup</em>.</div>`);
-      }
+    // Next deadlines of applications not sent yet, soonest first
+    const next = positions.filter(p => NOT_SENT.has(p.status) && deadlineAt(p) !== null && !isExpired(p))
+      .sort((a, b) => deadlineAt(a) - deadlineAt(b)).slice(0, 5);
+    if (next.length) {
+      out.push(`<div class="upcoming"><strong>📅 Next deadlines</strong><ul>${next.map(p => {
+        const days = daysFromToday(p.deadline);
+        const cls = days <= 3 ? 'overdue' : days <= DEADLINE_WARN_DAYS ? 'due-soon' : '';
+        const docs = p.docs || [];
+        return `<li><span class="chip ${cls}">${esc(fmtDeadline(p))}${esc(timeLeft(p))}</span> ${link(p)}${docs.length ? ` <span class="muted">· ${docs.filter(d => d.done).length}/${docs.length} docs ready</span>` : ''}</li>`;
+      }).join('')}</ul></div>`);
     }
+    if (stale.length) out.push(`<div class="alert"><strong>No news for ${NO_RESPONSE_DAYS}+ days</strong> (follow up or mark as “No response”): ${stale.map(link).join(', ')}</div>`);
     $('#alerts').innerHTML = out.join('');
   }
 
@@ -243,7 +296,7 @@
       deadline: (a, b) => {
         // Open (not yet sent) applications first, by deadline; then the rest
         const ao = NOT_SENT.has(a.status) ? 0 : 1, bo = NOT_SENT.has(b.status) ? 0 : 1;
-        return ao - bo || (a.deadline || far).localeCompare(b.deadline || far);
+        return ao - bo || (deadlineAt(a) ?? Infinity) - (deadlineAt(b) ?? Infinity) || (a.deadline || far).localeCompare(b.deadline || far);
       },
       updated: (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0),
       applied: (a, b) => (b.appliedDate || '').localeCompare(a.appliedDate || ''),
@@ -304,13 +357,15 @@
   function addToTracker(x, extra = {}) {
     const now = Date.now();
     const fields = ['title', 'type', 'reference', 'institution', 'group', 'pi', 'keywords', 'country',
-      'city', 'callUrl', 'deadline', 'startDate', 'duration', 'salary', 'method', 'applyEmail',
+      'city', 'callUrl', 'deadline', 'deadlineTime', 'deadlineTz', 'startDate', 'duration', 'salary', 'method', 'applyEmail',
       'applyUrl', 'emailSubject', 'procedure', 'contactName', 'contactEmail'];
     const p = { id: uid(), createdAt: now, updatedAt: now, status: 'saved', priority: 'normal', ...extra };
     fields.forEach(f => { p[f] = x[f] ?? ''; });
     if (!TYPES.includes(p.type)) p.type = p.type ? 'Other' : 'Postdoc';
     if (!COUNTRIES.includes(p.country)) p.country = p.country ? 'Other' : '';
     if (!METHOD_LABEL[p.method]) p.method = p.applyEmail ? 'email' : p.applyUrl ? 'portal' : 'other';
+    if (!validTime(p.deadlineTime)) p.deadlineTime = '';
+    if (x.callText) p.callText = String(x.callText).slice(0, 20000);
     p.notes = [x.why && `Why it matches (auto-search): ${x.why}`, x.source && `Found on: ${x.source}`, x.notes]
       .filter(Boolean).join('\n');
     p.docs = (Array.isArray(x.documents) && x.documents.length ? x.documents : DEFAULT_DOCS.slice(0, 4))
@@ -341,11 +396,25 @@
       deleted = state.deleted && typeof state.deleted === 'object' ? state.deleted : {};
       persist({ silent: true });
       render();
+      setTimeout(purgeExpired, 0); // after the sync has finished applying, so the removal is saved too
     },
     onPersist: fn => persistListeners.push(fn),
     toast: (msg, action) => toast(msg, action),
-    esc, fmtDate, daysFromToday, todayISO,
+    // used by letter.js (cover letters, required-documents check)
+    get: id => positions.find(x => x.id === id),
+    update: (id, fn) => {
+      const p = positions.find(x => x.id === id);
+      if (!p) return;
+      fn(p);
+      p.updatedAt = Date.now();
+      persist();
+      render();
+      if ($('#detail-dialog').open && detailId === id) openDetail(id);
+    },
+    onDetail: fn => detailListeners.push(fn),
+    esc, fmtDate, daysFromToday, todayISO, deadlineAt, isExpired, fmtDeadline, timeLeft, validTime, tzOf,
   };
+  const detailListeners = [];
 
   function render() {
     listeners.forEach(fn => { try { fn(); } catch { /* ignore */ } });
@@ -353,6 +422,28 @@
     renderStats();
     renderAlerts();
     renderList();
+  }
+
+  // Applications never sent whose deadline has passed are removed automatically
+  // (ones already sent stay, since they are waiting for an answer).
+  function purgeExpired() {
+    const gone = positions.filter(p => NOT_SENT.has(p.status) && !p.keepExpired && isExpired(p));
+    if (!gone.length) return;
+    const now = Date.now();
+    positions = positions.filter(p => !gone.includes(p));
+    gone.forEach(p => { deleted[p.id] = now; });
+    persist();
+    render();
+    const what = gone.length === 1 ? `"${gone[0].title.length > 40 ? gone[0].title.slice(0, 40) + '…' : gone[0].title}"` : `${gone.length} positions`;
+    toast(`Deadline passed: removed ${what} from your tracker`, {
+      label: 'Undo',
+      run: () => {
+        gone.forEach(p => { p.keepExpired = true; p.updatedAt = Date.now(); delete deleted[p.id]; positions.push(p); });
+        persist();
+        render();
+        toast('Restored');
+      },
+    });
   }
 
   // ---------- Status changes ----------
@@ -392,6 +483,7 @@
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
     for (const k in data) data[k] = data[k].trim();
+    if (!validTime(data.deadlineTime)) data.deadlineTime = '';
     const now = Date.now();
 
     if (editingId) {
@@ -488,7 +580,8 @@
     if (!p) return;
     detailId = id;
     $('#detail-title').textContent = p.title;
-    const docs = (p.docs || []).map(d => `${d.done ? '✅' : '⬜'} ${esc(d.name)}`).join('<br>');
+    const docs = (p.docs || []).map((d, i) =>
+      `<label><input type="checkbox" data-detail-doc="${i}" ${d.done ? 'checked' : ''}> ${esc(d.name)}</label>`).join('');
     const history = (p.history || []).slice().reverse()
       .map(h => `<li><time>${esc(fmtDate(h.date))}</time>${statusBadge(h.status)}</li>`).join('');
 
@@ -504,7 +597,7 @@
         ${row('Location', [p.city, p.country].filter(Boolean).join(', '))}
         ${row('Field / keywords', p.keywords)}
         ${row('Call / job ad', p.callUrl && link(p.callUrl), true)}
-        ${row('Deadline', fmtDate(p.deadline))}
+        ${row('Deadline', fmtDeadline(p))}
         ${row('Start date', p.startDate)}
         ${row('Duration', p.duration)}
         ${row('Salary / funding', p.salary)}
@@ -516,8 +609,12 @@
         ${row('Email subject', p.emailSubject)}
         ${row('Portal / website', p.applyUrl && link(p.applyUrl), true)}
         ${row('Portal account', p.portalAccount)}
-        ${row('Required documents', docs, true)}
       </dl>
+      <div class="docs-check">
+        <div class="docs-check-head"><strong>Required documents</strong> <small class="muted">(tick when ready)</small>
+          <button type="button" class="btn small" id="btn-check-docs">🔍 Check the call</button></div>
+        <div class="docs-list detail-docs">${docs || '<span class="muted">None listed yet.</span>'}</div>
+      </div>
       ${p.procedure ? `<div class="pre" style="margin-top:8px">${esc(p.procedure)}</div>` : ''}
       </div>
 
@@ -536,9 +633,20 @@
 
       ${p.notes ? `<div class="detail-section"><h4>Notes</h4><div class="pre">${esc(p.notes)}</div></div>` : ''}
     `;
-    $('#detail-dialog').showModal();
+    if (!$('#detail-dialog').open) $('#detail-dialog').showModal();
+    detailListeners.forEach(fn => { try { fn(p); } catch { /* ignore */ } });
   }
 
+  $('#detail-body').addEventListener('change', e => {
+    const i = e.target.dataset.detailDoc;
+    if (i === undefined) return;
+    const p = positions.find(x => x.id === detailId);
+    if (!p || !p.docs[i]) return;
+    p.docs[i].done = e.target.checked;
+    p.updatedAt = Date.now();
+    persist();
+    render();
+  });
   $('#detail-body').addEventListener('click', e => {
     const c = e.target.dataset.copy;
     if (c) navigator.clipboard?.writeText(c).then(() => toast('Copied'));
@@ -615,7 +723,7 @@
   $('#btn-export-csv').addEventListener('click', () => {
     const cols = [
       ['title', 'Title'], ['type', 'Type'], ['institution', 'Institution'], ['group', 'Group'],
-      ['pi', 'PI'], ['city', 'City'], ['country', 'Country'], ['deadline', 'Deadline'],
+      ['pi', 'PI'], ['city', 'City'], ['country', 'Country'], ['deadline', 'Deadline'], ['deadlineTime', 'Deadline time'],
       ['status', 'Status'], ['appliedDate', 'Applied'], ['method', 'Method'],
       ['applyEmail', 'Apply email'], ['applyUrl', 'Apply URL'], ['callUrl', 'Call URL'],
       ['procedure', 'Procedure'], ['contactName', 'Contact'], ['contactEmail', 'Contact email'],
@@ -664,4 +772,6 @@
   fillSelect($('#filter-type'), TYPES, { blank: 'All position types' });
   $('#btn-new').addEventListener('click', () => openForm(null));
   render();
+  purgeExpired();
+  setInterval(purgeExpired, PURGE_EVERY_MS);
 })();

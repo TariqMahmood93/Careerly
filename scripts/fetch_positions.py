@@ -23,6 +23,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from zoneinfo import ZoneInfo
 
 UA = ('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) '
       'Chrome/126 Safari/537.36 Careerly/1.0 (personal job tracker)')
@@ -163,8 +164,55 @@ def parse_date(s):
     return ''
 
 
-def is_open(deadline):
-    return not deadline or deadline >= TODAY.isoformat()
+TIME_RE = re.compile(r'(?:\bore|\bh\.?|\balle|\bat|-|,)\s*(\d{1,2})[:.](\d{2})\b|\b(\d{1,2})[:.](\d{2})\s*(?:h\b|CET|CEST|\()', re.I)
+TZ_RE = re.compile(r'\(([A-Z][A-Za-z_]+/[A-Za-z_]+(?:/[A-Za-z_]+)?)\)')
+COUNTRY_TZ = {
+    'United Kingdom': 'Europe/London', 'Ireland': 'Europe/Dublin', 'Portugal': 'Europe/Lisbon',
+    'Iceland': 'Atlantic/Reykjavik', 'Finland': 'Europe/Helsinki', 'Estonia': 'Europe/Tallinn',
+    'Latvia': 'Europe/Riga', 'Lithuania': 'Europe/Vilnius', 'Greece': 'Europe/Athens',
+    'Romania': 'Europe/Bucharest', 'Bulgaria': 'Europe/Sofia', 'Cyprus': 'Asia/Nicosia',
+}
+
+
+def parse_time(s):
+    """'31 Oct 2026 - 13:00 (Europe/Brussels)' -> ('13:00', 'Europe/Brussels'); ('', '') when not stated."""
+    m = TIME_RE.search(s or '')
+    t = ''
+    if m:
+        h, mi = (int(m.group(1)), int(m.group(2))) if m.group(1) else (int(m.group(3)), int(m.group(4)))
+        if (h, mi) == (24, 0):
+            h, mi = 23, 59
+        if h < 24 and mi < 60:
+            t = f'{h:02d}:{mi:02d}'
+    z = TZ_RE.search(s or '')
+    tz = z.group(1) if z else ''
+    try:
+        if tz:
+            ZoneInfo(tz)
+    except Exception:  # noqa: BLE001
+        tz = ''
+    return t, tz
+
+
+def deadline_moment(p):
+    """When the call closes: deadline date + time (23:59 if not stated) in the call's time zone."""
+    d = p.get('deadline') or ''
+    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', d):
+        return None
+    t = p.get('deadlineTime') or '23:59'
+    tz = p.get('deadlineTz') or COUNTRY_TZ.get(p.get('country', ''), 'Europe/Rome')
+    try:
+        return dt.datetime.fromisoformat(f'{d}T{t}:59' if t == '23:59' else f'{d}T{t}:00').replace(tzinfo=ZoneInfo(tz))
+    except (ValueError, KeyError):
+        return None
+
+
+def is_open(p):
+    """Accepts a position dict (or a bare deadline string)."""
+    if isinstance(p, str) or p is None:
+        p = {'deadline': p or ''}
+    m = deadline_moment(p)
+    return m is None or m > dt.datetime.now(dt.timezone.utc)
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +238,7 @@ MUR_LABELS = {
     'amount': ['Importo annuale', 'Importo'],
     'duration': ['Massima durata dell\'assegno', 'Durata', 'Durata in mesi', 'Durata del contratto'],
     'city': ['Sede', 'Città', 'Sede di servizio'],
+    'deadline': ['Data di scadenza', 'Scadenza bando', 'Scadenza del bando', 'Scadenza', 'Data scadenza'],
 }
 
 
@@ -233,7 +282,9 @@ def fetch_mur(cache):
             if not link:
                 continue
             path, num, title = link.group(1), link.group(2), text(link.group(3))
-            deadline = parse_date(re.search(r'scade il ([\d/]+)', b).group(1)) if 'scade il' in b else ''
+            dl = re.search(r'scade il ([\d/]+)([^<]{0,40})', b)
+            deadline = parse_date(dl.group(1)) if dl else ''
+            dl_time = parse_time(dl.group(2))[0] if dl else ''
             inst = text(re.search(r'<strong>(.*?)</strong>', b, flags=re.S).group(1)) if '<strong>' in b else ''
             settore = re.findall(r'<strong>\s*(?:Settore|S\.S\.D\.)\s*(.*?)</strong>', b, flags=re.S)
             pid = f'mur-{script.split(".")[0]}-{num}'
@@ -248,12 +299,15 @@ def fetch_mur(cache):
             desc = det.get('desc_en') or det.get('desc_it') or ''
             field = ' / '.join(x for x in [text(settore[0]) if settore else '', det.get('ssd', ''), det.get('area', '')] if x)
             sc, hits = score(title, title_en, desc, field)
+            if not dl_time and det.get('deadline') and parse_date(det['deadline']) == deadline:
+                dl_time = parse_time(det['deadline'])[0]
             items.append({
                 'id': pid, 'source': 'Bandi MUR', 'kind': kind, 'type': ptype,
                 'title': title_en if title_en and len(title) < 25 else title,
                 'titleAlt': title_en if title_en and title_en != title else '',
                 'institution': inst, 'country': 'Italy', 'city': det.get('city', ''),
-                'deadline': deadline, 'url': MUR + path, 'applyUrl': det.get('site', ''),
+                'deadline': deadline, 'deadlineTime': dl_time, 'deadlineTz': 'Europe/Rome',
+                'url': MUR + path, 'applyUrl': det.get('site', ''),
                 'field': short(field, 200), 'summary': short(desc, 500),
                 'salary': (det.get('amount', '') + ' € / year') if det.get('amount', '').isdigit() else det.get('amount', ''),
                 'duration': det.get('duration', ''),
@@ -293,6 +347,7 @@ def fetch_jobsacuk(cache):
                 sal = text((re.search(r'Salary:\s*</strong>(.*?)</div>', r, flags=re.S) or [None, ''])[1])
                 closes = text((re.search(r'date--blue[^>]*>(.*?)</span>', r, flags=re.S) or [None, ''])[1])
                 deadline = parse_date(closes)
+                dl_time = parse_time(closes)[0]
                 if EXCLUDE_RE.search(title) or not RESEARCH_ROLE_RE.search(title):
                     continue
                 sc, hits = score(title, dept)
@@ -302,7 +357,8 @@ def fetch_jobsacuk(cache):
                 items.append({
                     'id': f'jac-{link.group(2)}', 'source': 'jobs.ac.uk', 'kind': '', 'type': ptype,
                     'title': title, 'titleAlt': '', 'institution': emp, 'country': 'United Kingdom',
-                    'city': loc, 'deadline': deadline, 'url': JAC + link.group(1), 'applyUrl': '',
+                    'city': loc, 'deadline': deadline, 'deadlineTime': dl_time, 'deadlineTz': 'Europe/London',
+                    'url': JAC + link.group(1), 'applyUrl': '',
                     'field': dept, 'summary': '', 'salary': sal, 'duration': '',
                     'score': sc, 'matched': hits,
                 })
@@ -347,6 +403,8 @@ def eux_offer(num):
         'field': pairs.get('Research Field', ''),
         'profile': pairs.get('Researcher Profile', ''),
         'deadline': parse_date(pairs.get('Application Deadline', '')),
+        'deadlineTime': parse_time(pairs.get('Application Deadline', ''))[0],
+        'deadlineTz': parse_time(pairs.get('Application Deadline', ''))[1],
         'country': pairs.get('Country', ''),
         'city': pairs.get('City', ''),
         'contract': pairs.get('Type of Contract', ''),
@@ -395,6 +453,7 @@ def fetch_euraxess(cache):
             'id': pid, 'source': 'EURAXESS', 'kind': o['profile'], 'type': ptype,
             'title': o['title'], 'titleAlt': '', 'institution': o['institution'],
             'country': o['country'], 'city': o['city'], 'deadline': o['deadline'],
+            'deadlineTime': o['deadlineTime'], 'deadlineTz': o['deadlineTz'] or ('Europe/Brussels' if o['deadlineTime'] else ''),
             'url': f'{EUX}/jobs/{num}', 'applyUrl': '', 'field': o['field'],
             'summary': o['summary'], 'salary': '', 'duration': o['contract'],
             'score': sc, 'matched': hits,
@@ -436,13 +495,15 @@ def main():
     done = {}  # source name -> fresh list
 
     def previous(name):
-        return [dict(p) for p in old.get('positions', []) if p.get('source') == name and is_open(p.get('deadline'))]
+        return [dict(p) for p in old.get('positions', []) if p.get('source') == name and is_open(p)]
 
     def save():
         """Write the output now, using fresh data where collected and yesterday's otherwise."""
         positions, details = [], {}
         for _, (name, _) in fetchers.items():
             for p in (done[name] if name in done else previous(name)):
+                if not is_open(p):
+                    continue
                 p = dict(p)
                 p['firstSeen'] = (cache.get(p['id'], {}).get('firstSeen') or p.get('firstSeen')
                                   or (TODAY.isoformat() if name in had else yesterday))
@@ -473,7 +534,7 @@ def main():
             continue
         print(f'Fetching {name}…', flush=True)
         try:
-            got = [p for p in fn(cache) if is_open(p['deadline'])]
+            got = [p for p in fn(cache) if is_open(p)]
             if key == 'eux':  # incremental: keep earlier offers that are still open
                 ids = {p['id'] for p in got}
                 got += [p for p in previous(name) if p['id'] not in ids]

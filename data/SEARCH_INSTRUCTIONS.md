@@ -47,12 +47,19 @@ Each morning a scheduled Claude session follows these steps to add "⭐ Claude p
    pica.cineca.it) in `applyUrl` when known.
 
 3. For each candidate call, open the call page if the network allows it and extract the real details. **Never invent details.**
-   Leave a field as "" when the call does not state it.
+   Leave a field as "" when the call does not state it. In particular:
+   - **Deadline time:** if the call states a closing time (e.g. "ore 13:00", "12:00 noon CET", "23:59 Brussels time"),
+     put it in `deadlineTime` as 24-hour `HH:MM` and the time zone in `deadlineTz` (IANA name, e.g. `Europe/Rome`).
+     The app removes a call the moment it closes; without a time it stays until the end of the deadline day.
+   - **Documents:** list every document the call asks for in `documents` (e.g. "CV", "Cover letter",
+     "Research proposal (max 3 pages)", "Reference letters (2)", "PhD certificate", "Publication list",
+     "ID / passport copy", "Self-declaration (DSAN)"), and special requirements (PEC, signatures, a single PDF)
+     in `procedure`.
 4. Keep only calls that: are open (deadline today or later, or not stated but posted recently),
    match the profile (core keywords weigh most), and respect the "Exclude" list.
 5. Skip calls already in `data/suggestions.json` (same `id` or same `callUrl`).
 6. Append new items to the `suggestions` array, set `updatedAt` to the current ISO timestamp, and remove
-   items whose deadline passed more than 7 days ago. Keep the file as valid JSON.
+   items whose deadline has passed (date and, if given, time). Keep the file as valid JSON.
 7. Commit with a message like `Daily search: N new positions (YYYY-MM-DD)` and push to `main`.
    If nothing new was found, still update `updatedAt` and push, so the app shows the search ran.
 
@@ -72,6 +79,8 @@ Each morning a scheduled Claude session follows these steps to add "⭐ Claude p
   "callUrl": "https://... (the page describing the call)",
   "reference": "",
   "deadline": "YYYY-MM-DD or empty",
+  "deadlineTime": "HH:MM (24h) if the call states a closing time, else empty",
+  "deadlineTz": "IANA time zone of that time, e.g. Europe/Rome, else empty",
   "startDate": "",
   "duration": "",
   "salary": "",

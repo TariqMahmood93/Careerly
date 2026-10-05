@@ -163,12 +163,45 @@
       .replace(/^(.*\b(?:phone|tel|telephone|mobile|cell)\b\s*[:.]?).*$/gim, '$1 [removed]');
   }
 
-  // Shared with positions.js (personal matching), which never uploads the text anywhere
+  // Word (.docx) files are zip archives; the text is in word/document.xml
+  async function docxToText(file) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const dv = new DataView(buf.buffer);
+    let eocd = -1;
+    for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {
+      if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('This Word file could not be read. Please save it as PDF and try again.');
+    let p = dv.getUint32(eocd + 16, true);
+    const count = dv.getUint16(eocd + 10, true);
+    for (let n = 0; n < count; n++) {
+      const method = dv.getUint16(p + 10, true), size = dv.getUint32(p + 20, true);
+      const nameLen = dv.getUint16(p + 28, true), extra = dv.getUint16(p + 30, true), comment = dv.getUint16(p + 32, true);
+      const local = dv.getUint32(p + 42, true);
+      const name = new TextDecoder().decode(buf.subarray(p + 46, p + 46 + nameLen));
+      if (name === 'word/document.xml') {
+        const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
+        let data = buf.subarray(start, start + size);
+        if (method === 8) {
+          if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot read Word files. Please save your CV as PDF.');
+          data = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+        }
+        const xml = new TextDecoder().decode(data);
+        return xml.replace(/<w:tab\/>/g, ' ').replace(/<\/w:p>|<w:br\/>/g, '\n').replace(/<[^>]+>/g, '')
+          .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+      }
+      p += 46 + nameLen + extra + comment;
+    }
+    throw new Error('No text found in this Word file. Please save it as PDF and try again.');
+  }
+
+  // Shared with positions.js (personal matching) and letter.js (cover letters)
   async function extractCvText(file) {
     let text;
     if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') text = await pdfToText(file);
+    else if (/\.docx$/i.test(file.name)) text = await docxToText(file);
     else if (/\.(txt|md|markdown|tex)$/i.test(file.name) || file.type.startsWith('text/')) text = await file.text();
-    else throw new Error('Please upload a PDF or a text (.txt / .md) file. For Word files, save as PDF first.');
+    else throw new Error('Please upload a PDF, Word (.docx) or text (.txt / .md) file.');
     text = tidy(text);
     if (text.length < 200) throw new Error('Very little text was found. If the PDF is a scanned image, upload a text-based PDF.');
     return text;
