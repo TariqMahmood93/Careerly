@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Careerly — Research Application Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">C</span>
+      <div>
+        <h1>Careerly</h1>
+        <p class="tagline">Track your postdoc &amp; researcher applications across Europe</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="btn primary" id="btn-new">+ New position</button>
+      <div class="menu">
+        <button class="btn" id="btn-data">Backup ▾</button>
+        <div class="menu-list" id="data-menu" hidden>
+          <button id="btn-export-json">Export backup (.json)</button>
+          <button id="btn-export-csv">Export spreadsheet (.csv)</button>
+          <label class="menu-file">Import backup (.json)
+            <input type="file" id="import-file" accept="application/json,.json" hidden>
+          </label>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="stats" id="stats"></section>
+
+    <section class="alerts" id="alerts"></section>
+
+    <section class="toolbar">
+      <input type="search" id="search" placeholder="Search title, institution, PI, keywords, notes…">
+      <select id="filter-status"><option value="">All statuses</option></select>
+      <select id="filter-country"><option value="">All countries</option></select>
+      <select id="filter-type"><option value="">All position types</option></select>
+      <select id="sort">
+        <option value="deadline">Sort: deadline (soonest)</option>
+        <option value="updated">Sort: recently updated</option>
+        <option value="applied">Sort: date applied</option>
+        <option value="institution">Sort: institution A–Z</option>
+      </select>
+    </section>
+
+    <section id="list" class="list"></section>
+    <p id="empty" class="empty" hidden>
+      No positions yet. Click <strong>+ New position</strong> to add your first call.
+    </p>
+  </main>
+
+  <!-- Add / edit form -->
+  <dialog id="form-dialog">
+    <form id="position-form" method="dialog">
+      <div class="dialog-head">
+        <h2 id="form-title">New position</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+      </div>
+
+      <div class="dialog-body">
+        <fieldset>
+          <legend>The position</legend>
+          <div class="grid">
+            <label class="span-2">Position title *
+              <input name="title" required placeholder="e.g. Postdoctoral Researcher in Computational Biology">
+            </label>
+            <label>Position type
+              <select name="type"></select>
+            </label>
+            <label>Reference / call ID
+              <input name="reference" placeholder="e.g. REF-2026-114">
+            </label>
+            <label>Institution / university *
+              <input name="institution" required placeholder="e.g. KU Leuven">
+            </label>
+            <label>Department / research group
+              <input name="group" placeholder="e.g. Dept. of Physics, Quantum Lab">
+            </label>
+            <label>PI / supervisor
+              <input name="pi" placeholder="e.g. Prof. Jane Doe">
+            </label>
+            <label>Field / keywords
+              <input name="keywords" placeholder="e.g. machine learning, genomics">
+            </label>
+            <label>Country
+              <select name="country"></select>
+            </label>
+            <label>City
+              <input name="city" placeholder="e.g. Leuven">
+            </label>
+            <label class="span-2">Link to the call / job ad
+              <input name="callUrl" type="url" placeholder="https://…">
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Key dates &amp; conditions</legend>
+          <div class="grid">
+            <label>Application deadline
+              <input name="deadline" type="date">
+            </label>
+            <label>Expected start date
+              <input name="startDate" type="text" placeholder="e.g. Jan 2027 / negotiable">
+            </label>
+            <label>Contract duration
+              <input name="duration" placeholder="e.g. 2 years, renewable">
+            </label>
+            <label>Salary / funding
+              <input name="salary" placeholder="e.g. €4,200 gross/month, MSCA">
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>How to apply</legend>
+          <div class="grid">
+            <label>Application method
+              <select name="method">
+                <option value="email">By email</option>
+                <option value="portal">Online portal / website</option>
+                <option value="both">Email + portal</option>
+                <option value="other">Other (post, contact PI first…)</option>
+              </select>
+            </label>
+            <label>Send application to (email)
+              <input name="applyEmail" type="email" placeholder="e.g. jobs@university.eu">
+            </label>
+            <label class="span-2">Application portal / website
+              <input name="applyUrl" type="url" placeholder="https://jobs.university.eu/apply/…">
+            </label>
+            <label>Email subject line required
+              <input name="emailSubject" placeholder="e.g. Application REF-2026-114 – Your Name">
+            </label>
+            <label>Portal login / account
+              <input name="portalAccount" placeholder="e.g. username or email used (no passwords!)">
+            </label>
+            <label class="span-2">Procedure / instructions
+              <textarea name="procedure" rows="4" placeholder="Copy the exact instructions from the call, e.g. &quot;Send a single PDF with CV, cover letter and 2 references to … by 15 Nov. Shortlisted candidates will be interviewed in December.&quot;"></textarea>
+            </label>
+          </div>
+          <div class="docs">
+            <span class="docs-label">Required documents <small>(tick when ready)</small></span>
+            <div id="docs-list" class="docs-list"></div>
+            <div class="add-doc">
+              <input id="new-doc" placeholder="Add another document…">
+              <button type="button" class="btn small" id="btn-add-doc">Add</button>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Contact person</legend>
+          <div class="grid">
+            <label>Name
+              <input name="contactName" placeholder="e.g. Dr. John Smith / HR office">
+            </label>
+            <label>Email
+              <input name="contactEmail" type="email" placeholder="e.g. john.smith@uni.eu">
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Application status</legend>
+          <div class="grid">
+            <label>Status
+              <select name="status"></select>
+            </label>
+            <label>Date applied
+              <input name="appliedDate" type="date">
+            </label>
+            <label>Last follow-up sent
+              <input name="followUpDate" type="date">
+            </label>
+            <label>Interview date
+              <input name="interviewDate" type="date">
+            </label>
+            <label>Priority
+              <select name="priority">
+                <option value="normal">Normal</option>
+                <option value="high">High ★</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
+            <label class="span-2">Notes
+              <textarea name="notes" rows="3" placeholder="Anything else: who you spoke to, interview feedback, what to tailor…"></textarea>
+            </label>
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="dialog-foot">
+        <button type="button" class="btn danger" id="btn-delete" hidden>Delete</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Detail view -->
+  <dialog id="detail-dialog">
+    <div class="dialog-head">
+      <h2 id="detail-title"></h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="dialog-body" id="detail-body"></div>
+    <div class="dialog-foot">
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>Close</button>
+      <button type="button" class="btn primary" id="btn-detail-edit">Edit</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
