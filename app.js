@@ -150,16 +150,23 @@
     return `<span class="badge" style="--status-color:${s.color}"><span class="dot"></span>${esc(s.label)}</span>`;
   }
 
-  function deadlineChip(p) {
-    if (!p.deadline) return '';
-    const days = daysFromToday(p.deadline);
-    let cls = '', extra = '';
-    if (NOT_SENT.has(p.status)) {
-      if (days < 0) { cls = 'overdue'; extra = ' (passed)'; }
-      else if (days === 0) { cls = 'due-soon'; extra = ' (today!)'; }
-      else if (days <= DEADLINE_WARN_DAYS) { cls = 'due-soon'; extra = ` (${days}d left)`; }
+  function deadlineChip(p, { full = false } = {}) {
+    if (!p.deadline) {
+      return full
+        ? `<span class="chip deadline-missing" data-set-deadline="${p.id}" title="Add the deadline">⏰ Deadline not stated · <u>add</u></span>`
+        : '';
     }
-    return `<span class="chip ${cls}">⏰ ${esc(fmtDate(p.deadline))}${extra}</span>`;
+    const days = daysFromToday(p.deadline);
+    const open = NOT_SENT.has(p.status);
+    let cls = '', extra = '';
+    if (days < 0) { cls = open ? 'overdue' : ''; extra = ` · passed ${-days}d ago`; }
+    else if (days === 0) { cls = open ? 'overdue' : ''; extra = ' · today!'; }
+    else {
+      extra = ` · ${days} day${days === 1 ? '' : 's'} left`;
+      if (open && days <= DEADLINE_WARN_DAYS) cls = 'due-soon';
+    }
+    if (!full && !open) extra = '';
+    return `<span class="chip ${cls}">⏰ ${full ? 'Deadline: ' : ''}${esc(fmtDate(p.deadline))}${extra}</span>`;
   }
 
   function howToApplyShort(p) {
@@ -263,7 +270,7 @@
         <div class="meta">
           ${loc ? `<span class="chip">📍 ${esc(loc)}</span>` : ''}
           ${p.type ? `<span class="chip">${esc(p.type)}</span>` : ''}
-          ${deadlineChip(p)}
+          ${deadlineChip(p, { full: true })}
           ${docs.length && NOT_SENT.has(p.status) ? `<span class="chip">📄 ${ready}/${docs.length} docs ready</span>` : ''}
           ${p.appliedDate ? `<span class="chip">Applied ${esc(fmtDate(p.appliedDate))}</span>` : ''}
         </div>
@@ -553,7 +560,7 @@
       .map(h => `<li><time>${esc(fmtDate(h.date))}</time>${statusBadge(h.status)}</li>`).join('');
 
     $('#detail-body').innerHTML = `
-      <div class="detail-section">${statusBadge(p.status)} ${p.priority === 'high' ? '<span class="chip">★ High priority</span>' : ''} ${deadlineChip(p)}</div>
+      <div class="detail-section">${statusBadge(p.status)} ${p.priority === 'high' ? '<span class="chip">★ High priority</span>' : ''} ${deadlineChip(p, { full: true })}</div>
 
       <div class="detail-section"><h4>Position</h4><dl class="kv">
         ${row('Institution', p.institution)}
@@ -622,6 +629,12 @@
   $('#list').addEventListener('click', e => {
     const del = e.target.closest('[data-del]');
     if (del) { deletePosition(del.dataset.del); return; }
+    const setDl = e.target.closest('[data-set-deadline]');
+    if (setDl) {
+      openForm(positions.find(x => x.id === setDl.dataset.setDeadline));
+      form.elements.deadline.focus();
+      return;
+    }
     if (e.target.closest('select')) return;
     const card = e.target.closest('.card');
     if (card) openDetail(card.dataset.id);

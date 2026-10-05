@@ -326,3 +326,6 @@ code { background: var(--surface-2); padding: 0 4px; border-radius: 4px; }
 .toast[hidden] { display: none; }
 .toast-action { background: none; border: 1px solid currentColor; color: inherit; border-radius: 6px;
   padding: 2px 10px; font: inherit; font-weight: 600; cursor: pointer; }
+
+.chip.deadline-missing { cursor: pointer; color: var(--muted); }
+.chip.deadline-missing:hover { color: var(--primary); }
