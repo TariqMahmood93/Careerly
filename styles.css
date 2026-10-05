@@ -100,6 +100,27 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; }
 }
 .menu-list button:hover, .menu-file:hover { background: var(--surface-2); }
 
+/* ---------- Suggestions inbox ---------- */
+.suggestions {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 16px; margin-bottom: 18px; box-shadow: var(--shadow);
+}
+.sugg-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.sugg-head h2 { margin: 0; font-size: 17px; }
+.sugg-actions { display: flex; gap: 6px; }
+.muted { color: var(--muted); margin: 2px 0 0; font-size: 13px; }
+.sugg-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin-top: 12px; }
+.sugg-list[hidden] { display: none; }
+.sugg {
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px; background: var(--bg);
+}
+.sugg h3 { margin: 0; font-size: 15px; line-height: 1.3; }
+.sugg .inst { color: var(--muted); font-size: 13px; }
+.why { margin: 0; font-size: 13px; color: var(--muted); }
+.sugg-foot { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: auto; }
+.chip.new { background: var(--primary); color: var(--primary-ink); font-weight: 700; }
+
 /* ---------- Stats ---------- */
 .stats {
   display: grid;
@@ -230,7 +251,7 @@ legend { font-weight: 600; padding: 0 6px; }
   .topbar, main { padding-left: 16px; padding-right: 16px; }
   .grid { grid-template-columns: 1fr; }
   .span-2 { grid-column: auto; }
-  .list { grid-template-columns: 1fr; }
+  .list, .sugg-list { grid-template-columns: 1fr; }
   .kv { grid-template-columns: 1fr; }
   .kv dt { margin-top: 6px; }
 }

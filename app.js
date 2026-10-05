@@ -7,6 +7,8 @@
 
   const STORAGE_KEY = 'careerly.positions.v1';
   const META_KEY = 'careerly.meta.v1';
+  const DISMISSED_KEY = 'careerly.dismissed.v1';
+  const SUGGESTIONS_URL = 'data/suggestions.json';
   const DAY = 24 * 60 * 60 * 1000;
   const NO_RESPONSE_DAYS = 60;
   const DEADLINE_WARN_DAYS = 7;
@@ -57,6 +59,9 @@
   // ---------- State ----------
   let positions = load(STORAGE_KEY, []);
   let meta = load(META_KEY, { lastExport: null });
+  let dismissed = new Set(load(DISMISSED_KEY, []));
+  let suggestions = [];
+  let suggestionsUpdated = null;
   let editingId = null;
   let formDocs = [];
 
@@ -272,7 +277,93 @@
     sel.value = used.includes(cur) ? cur : '';
   }
 
+  // ---------- Daily suggestions (filled by the scheduled Claude search) ----------
+  async function loadSuggestions() {
+    try {
+      const res = await fetch(`${SUGGESTIONS_URL}?t=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      suggestions = Array.isArray(data.suggestions) ? data.suggestions.filter(x => x && x.id && x.title) : [];
+      suggestionsUpdated = data.updatedAt || null;
+      renderSuggestions();
+    } catch {
+      // Opened as a local file or no data yet: the inbox simply stays hidden.
+    }
+  }
+
+  function pendingSuggestions() {
+    const added = new Set(positions.map(p => p.suggestionId).filter(Boolean));
+    const addedUrls = new Set(positions.map(p => p.callUrl).filter(Boolean));
+    return suggestions
+      .filter(x => !dismissed.has(x.id) && !added.has(x.id) && !(x.callUrl && addedUrls.has(x.callUrl)))
+      .filter(x => !x.deadline || daysFromToday(x.deadline) >= 0)
+      .sort((a, b) => (b.foundOn || '').localeCompare(a.foundOn || '') ||
+        (b.matchScore || 0) - (a.matchScore || 0));
+  }
+
+  function renderSuggestions() {
+    const box = $('#suggestions');
+    const list = pendingSuggestions();
+    if (!suggestions.length) { box.hidden = true; return; }
+    box.hidden = false;
+    const today = todayISO();
+    const newToday = list.filter(x => x.foundOn === today).length;
+    $('#sugg-summary').innerHTML =
+      `${list.length} to review${newToday ? ` · <strong>${newToday} new today</strong>` : ''}` +
+      (suggestionsUpdated ? ` · last search ${esc(new Date(suggestionsUpdated).toLocaleString())}` : '');
+    $('#sugg-list').innerHTML = list.length ? list.map(x => {
+      const loc = [x.city, x.country].filter(Boolean).join(', ');
+      const stars = x.matchScore ? '★'.repeat(Math.max(1, Math.min(5, x.matchScore))) : '';
+      return `<article class="sugg" data-sid="${esc(x.id)}">
+        <div class="card-top">
+          <div>
+            <h3>${esc(x.title)}</h3>
+            <div class="inst">${esc(x.institution || '')}${x.pi ? ' · ' + esc(x.pi) : ''}</div>
+          </div>
+          ${x.foundOn === today ? '<span class="chip new">NEW</span>' : ''}
+        </div>
+        <div class="meta">
+          ${stars ? `<span class="chip" title="Match with your profile">${stars}</span>` : ''}
+          ${loc ? `<span class="chip">📍 ${esc(loc)}</span>` : ''}
+          ${x.type ? `<span class="chip">${esc(x.type)}</span>` : ''}
+          ${x.deadline ? deadlineChip({ deadline: x.deadline, status: 'saved' }) : '<span class="chip">⏰ deadline not stated</span>'}
+        </div>
+        ${x.why ? `<p class="why">${esc(x.why)}</p>` : ''}
+        <div class="sugg-foot">
+          ${safeUrl(x.callUrl) ? `<a href="${esc(x.callUrl)}" target="_blank" rel="noopener">Open the call ↗</a>` : '<span></span>'}
+          <span class="spacer"></span>
+          <button class="btn small" data-dismiss="${esc(x.id)}">Dismiss</button>
+          <button class="btn small primary" data-accept="${esc(x.id)}">+ Add to tracker</button>
+        </div>
+      </article>`;
+    }).join('') : '<p class="empty">All caught up — nothing new to review.</p>';
+    $('#btn-restore-dismissed').hidden = dismissed.size === 0;
+  }
+
+  function acceptSuggestion(id) {
+    const x = suggestions.find(s => s.id === id);
+    if (!x) return;
+    const now = Date.now();
+    const fields = ['title', 'type', 'reference', 'institution', 'group', 'pi', 'keywords', 'country',
+      'city', 'callUrl', 'deadline', 'startDate', 'duration', 'salary', 'method', 'applyEmail',
+      'applyUrl', 'emailSubject', 'procedure', 'contactName', 'contactEmail'];
+    const p = { id: uid(), createdAt: now, updatedAt: now, suggestionId: x.id, status: 'saved', priority: 'normal' };
+    fields.forEach(f => { p[f] = x[f] ?? ''; });
+    if (!TYPES.includes(p.type)) p.type = p.type ? 'Other' : 'Postdoc';
+    if (!COUNTRIES.includes(p.country)) p.country = p.country ? 'Other' : '';
+    if (!METHOD_LABEL[p.method]) p.method = p.applyEmail ? 'email' : p.applyUrl ? 'portal' : 'other';
+    p.notes = x.why ? `Why it matches (auto-search): ${x.why}` : '';
+    p.docs = (Array.isArray(x.documents) && x.documents.length ? x.documents : DEFAULT_DOCS.slice(0, 4))
+      .map(name => ({ name: String(name), done: false }));
+    p.history = [{ status: 'saved', date: todayISO() }];
+    positions.push(p);
+    persist();
+    render();
+    toast('Added to your tracker');
+  }
+
   function render() {
+    renderSuggestions();
     renderCountryFilter();
     renderStats();
     renderAlerts();
@@ -552,6 +643,26 @@
     }
   });
 
+  $('#sugg-list').addEventListener('click', e => {
+    const acc = e.target.dataset.accept, dis = e.target.dataset.dismiss;
+    if (acc) acceptSuggestion(acc);
+    if (dis) {
+      dismissed.add(dis);
+      localStorage.setItem(DISMISSED_KEY, JSON.stringify([...dismissed]));
+      renderSuggestions();
+    }
+  });
+  $('#btn-restore-dismissed').addEventListener('click', () => {
+    dismissed = new Set();
+    localStorage.setItem(DISMISSED_KEY, '[]');
+    renderSuggestions();
+  });
+  $('#btn-toggle-sugg').addEventListener('click', () => {
+    const list = $('#sugg-list');
+    list.hidden = !list.hidden;
+    $('#btn-toggle-sugg').textContent = list.hidden ? 'Show' : 'Hide';
+  });
+
   // ---------- Init ----------
   fillSelect(form.elements.type, TYPES);
   fillSelect(form.elements.country, COUNTRIES, { blank: '— select —' });
@@ -560,4 +671,5 @@
   fillSelect($('#filter-type'), TYPES, { blank: 'All position types' });
   $('#btn-new').addEventListener('click', () => openForm(null));
   render();
+  loadSuggestions();
 })();

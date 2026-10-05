@@ -17,6 +17,18 @@ No account, no server, no build step: it's a single static web page, and your da
 
 Every status change is logged with a date, so each position shows its own timeline.
 
+## 🆕 Daily position search
+
+Every morning (06:00, Rome time) a scheduled Claude task searches the web for new postdoc and researcher
+calls that match the profile in [`data/profile.md`](data/profile.md). It adds them to
+[`data/suggestions.json`](data/suggestions.json) on `main`. When you open the app, they appear at the top under
+**New positions found for you**, where you can **+ Add to tracker** or **Dismiss** each one.
+
+- Edit `data/profile.md` to change what it looks for. The search steps are in
+  [`data/SEARCH_INSTRUCTIONS.md`](data/SEARCH_INSTRUCTIONS.md).
+- The inbox only works when the app is online (GitHub Pages, see below). It doesn't show when you open `index.html` as a local file.
+- Always check the original call before applying. Details are collected automatically and can be incomplete.
+
 ## Helpful extras
 
 - **Dashboard**: counts per status. Click a tile to filter.

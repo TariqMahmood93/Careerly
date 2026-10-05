@@ -31,6 +31,20 @@
   </header>
 
   <main>
+    <section class="suggestions" id="suggestions" hidden>
+      <div class="sugg-head">
+        <div>
+          <h2>🆕 New positions found for you</h2>
+          <p class="muted" id="sugg-summary"></p>
+        </div>
+        <div class="sugg-actions">
+          <button class="btn small" id="btn-restore-dismissed" hidden>Show dismissed again</button>
+          <button class="btn small" id="btn-toggle-sugg">Hide</button>
+        </div>
+      </div>
+      <div class="sugg-list" id="sugg-list"></div>
+    </section>
+
     <section class="stats" id="stats"></section>
 
     <section class="alerts" id="alerts"></section>
