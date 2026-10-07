@@ -1,4 +1,4 @@
-/* Careerly: optional accounts (Supabase).
+/* Scholarly: optional accounts (Supabase).
  * Signing in keeps your tracker and your CV-based matching profile in your account, so they
  * appear on any device or browser, incognito included. Each account can only read and write
  * its own row (row-level security). Without signing in, everything stays in this browser only.

@@ -1,4 +1,4 @@
-/* Careerly: cover-letter drafts (.docx) and the required-documents check.
+/* Scholarly: cover-letter drafts (.docx) and the required-documents check.
  *
  * Cover letter: built in the browser from the tracked call (title, institution, PI, topics,
  * pasted call text) and the user's CV text (kept in their account by positions.js / cloud.js).
@@ -361,9 +361,9 @@
     lines.push({ h: 'Documents to prepare' });
     const docs = p.docs || [];
     if (docs.length) docs.forEach(d => lines.push(`${d.done ? '☑' : '☐'} ${d.name}`));
-    else lines.push('☐ [No list yet: use “Check the call” in Careerly]');
+    else lines.push('☐ [No list yet: use “Check the call” in Scholarly]');
     lines.push({ h: 'Your topics that match the call' });
-    lines.push(a.matched.length ? a.matched.map(topicCase).join(', ') : '[none recognised: add the call text in Careerly for a better match]');
+    lines.push(a.matched.length ? a.matched.map(topicCase).join(', ') : '[none recognised: add the call text in Scholarly for a better match]');
     if (a.gaps.length) {
       lines.push({ h: 'Call topics not in your CV (consider addressing them)' });
       lines.push(a.gaps.map(topicCase).join(', '));

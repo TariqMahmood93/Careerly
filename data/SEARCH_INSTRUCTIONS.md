@@ -1,7 +1,7 @@
 # Daily position search: instructions for Claude
 
 Each morning a scheduled Claude session follows these steps to add "⭐ Claude pick" entries to the
-"All open positions" list in the Careerly app.
+"All open positions" list in the Scholarly app.
 
 1. Read the candidate's **CV (`data/cv.md`) and search profile (`data/profile.md`)**. The owner edits both from
    the app's "My profile & CV" button. The CV wins for skills and topics; the profile wins for preferences

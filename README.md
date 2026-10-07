@@ -1,4 +1,4 @@
-# Careerly
+# Scholarly
 
 A simple, private tracker for **postdoc, researcher and fellowship applications** across EU / European countries.
 Keep every call in one place: where it is, how to apply, what documents it needs, the deadline and where your application stands.
@@ -57,7 +57,7 @@ Open a tracked position and use:
   which opens in Word, Google Docs and LibreOffice. Page 2 of the file has preparation notes: the deadline with time,
   how to submit, the documents checklist and the call's topics your CV doesn't mention. Delete it before sending.
   Your edits are saved with the position.
-- **🔍 Check the call**: paste the call text (the job ad, or the bando's "Domanda di ammissione" section). Careerly
+- **🔍 Check the call**: paste the call text (the job ad, or the bando's "Domanda di ammissione" section). Scholarly
   finds the documents it asks for (CV, motivation letter, research proposal, reference letters and how many, PhD
   certificate, ID copy, DSAN self-declaration, publication list, Europass, and more, in English and Italian) and adds
   them to the checklist. It also reads the deadline time ("ore 13:00") and flags special requirements: PEC, signatures,
@@ -100,7 +100,7 @@ you a `.json` or `.csv` copy whenever you want one.
 
 1. Merge this code into the `main` branch.
 2. In the repo, go to **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
-3. The included workflow deploys the site. It will be at `https://<your-username>.github.io/Careerly/`.
+3. The included workflow deploys the site. It will be at `https://<your-username>.github.io/Scholarly/`.
 
 
 ## Files

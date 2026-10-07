@@ -1,4 +1,4 @@
-/* Careerly: "All open positions" browser.
+/* Scholarly: "All open positions" browser.
  * Shows every open call collected daily from Bandi MUR, EURAXESS and jobs.ac.uk
  * (data/positions.json, built by scripts/fetch_positions.py in GitHub Actions),
  * with filters for country, source, type and relevance to the profile.
@@ -249,9 +249,15 @@
     return sel.value;
   }
 
-  function filtered() {
+  // calls already in the tracker live in "Tracked positions", not in this list
+  function isTracked(p, tracked) {
+    return tracked.ids.has(p.id) || tracked.urls.has(p.url) || (p.pick && p.raw && tracked.urls.has(p.raw.callUrl));
+  }
+
+  function filtered(tracked) {
     const q = ($('#br-search').value || '').trim().toLowerCase();
-    let list = prefs.relevant ? all.filter(relOf) : all;
+    const open = all.filter(p => !isTracked(p, tracked));
+    let list = prefs.relevant ? open.filter(relOf) : open;
     if (q) {
       const terms = q.split(/\s+/);
       list = list.filter(p => {
@@ -286,13 +292,16 @@
   }
 
   function render() {
-    const list = filtered();
     const tracked = C.tracked();
+    const list = filtered(tracked);
     const today = todayISO();
-    const relevantCount = all.filter(relOf).length;
+    const open = all.filter(p => !isTracked(p, tracked));
+    const trackedCount = all.length - open.length;
+    const relevantCount = open.filter(relOf).length;
     const newToday = list.filter(p => p.firstSeen === today).length;
     $('#br-summary').innerHTML =
-      `<strong>${list.length}</strong> shown · ${all.length} open calls in total, ${relevantCount} match ${isPersonal() ? 'your CV' : 'the profile'}` +
+      `<strong>${list.length}</strong> shown · ${open.length} open calls in total, ${relevantCount} match ${isPersonal() ? 'your CV' : 'the profile'}` +
+      (trackedCount ? ` · ${trackedCount} already in your tracked positions` : '') +
       (newToday ? ` · <strong>${newToday} new today</strong>` : '') +
       (meta.updatedAt ? ` · updated ${esc(new Date(meta.updatedAt).toLocaleString())}` : '') +
       (meta.picksUpdatedAt ? ` · Claude's last search ${esc(new Date(meta.picksUpdatedAt).toLocaleString())}` : '');
@@ -301,7 +310,6 @@
     $('#br-sources').textContent = srcInfo ? `Sources — ${srcInfo}` : '';
 
     $('#br-list').innerHTML = list.slice(0, shown).map(p => {
-      const inTracker = tracked.ids.has(p.id) || tracked.urls.has(p.url);
       const loc = [p.city, p.country].filter(Boolean).join(', ');
       return `<article class="br-item">
         <div class="br-main">
@@ -328,8 +336,7 @@
           </details>` : ''}
         </div>
         <div class="br-actions">
-          ${inTracker ? '<span class="muted">✓ In tracker</span>'
-            : `<button class="btn small primary" data-add="${esc(p.id)}">+ Track</button>`}
+          <button class="btn small primary" data-add="${esc(p.id)}">+ Track</button>
         </div>
       </article>`;
     }).join('') || '<p class="empty">No open positions match these filters.</p>';

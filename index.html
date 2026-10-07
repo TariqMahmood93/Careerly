@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Careerly — Research Application Tracker</title>
+  <title>Scholarly — Research Application Tracker</title>
   <link rel="stylesheet" href="styles.css?v=__VERSION__">
 </head>
 <body class="locked auth-checking">
   <header class="topbar">
     <div class="brand">
-      <span class="logo">C</span>
+      <span class="logo">S</span>
       <div>
-        <h1>Careerly</h1>
+        <h1>Scholarly</h1>
         <p class="tagline">Track your postdoc &amp; researcher applications across Europe</p>
       </div>
     </div>
@@ -34,7 +34,7 @@
 
   <section id="auth-screen" class="auth-screen" aria-label="Log in">
       <div id="account-out" class="auth-card">
-        <h2 class="auth-title">Welcome to Careerly</h2>
+        <h2 class="auth-title">Welcome to Scholarly</h2>
         <p class="muted" style="margin:0 0 14px">Find open postdoc and researcher positions across Europe, ranked for your CV,
           and track your applications. Log in or create a free account to continue. Your data is private to your account
           and available on any device.</p>
@@ -95,6 +95,8 @@
         <button class="btn" id="br-more" hidden>Show more</button>
       </div>
     </section>
+
+    <div class="sugg-head tracked-head"><h2>📌 Tracked positions</h2></div>
 
     <section class="stats" id="stats"></section>
 
@@ -339,7 +341,7 @@
     </div>
     <div class="dialog-body">
       <p class="muted">Paste the call text: the job ad, or the bando's section on how to apply ("Domanda di ammissione",
-        "Documentazione da allegare"). Careerly finds the documents it asks for, the deadline time, and special
+        "Documentazione da allegare"). Scholarly finds the documents it asks for, the deadline time, and special
         requirements (PEC, signatures, page limits), and adds them to this position. What we already know about the call is checked too.</p>
       <textarea id="docs-text" rows="10" placeholder="Paste the call text here…"></textarea>
       <div class="docs-actions"><button type="button" class="btn primary" id="docs-run">Check</button>
@@ -394,8 +396,8 @@
             <p class="muted" style="margin:0 0 6px">The site needs a GitHub token to save. Do this once per device:</p>
             <ol class="muted steps">
               <li>Open <a id="token-help-link" target="_blank" rel="noopener">GitHub → new fine-grained token</a>.</li>
-              <li>Name it "Careerly", pick an expiration, and under <em>Repository access</em> choose
-                <strong>Only select repositories → Careerly</strong>.</li>
+              <li>Name it "Scholarly", pick an expiration, and under <em>Repository access</em> choose
+                <strong>Only select repositories → Scholarly</strong>.</li>
               <li>Under <em>Permissions → Repository permissions</em>, set <strong>Contents</strong> to <strong>Read and write</strong>.</li>
               <li>Click <em>Generate token</em>, copy it and paste it here. It's kept only in this browser.</li>
             </ol>

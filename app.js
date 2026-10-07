@@ -1,4 +1,4 @@
-/* Careerly — simple research-application tracker.
+/* Scholarly — simple research-application tracker.
  * Data is kept in the browser (localStorage) and synced to the signed-in account (cloud.js).
  */
 (() => {
@@ -724,7 +724,7 @@
   }
 
   $('#btn-export-json').addEventListener('click', () => {
-    download(`careerly-backup-${todayISO()}.json`,
+    download(`scholarly-backup-${todayISO()}.json`,
       JSON.stringify({ app: 'careerly', version: 1, exportedAt: new Date().toISOString(), positions }, null, 2),
       'application/json');
     meta.lastExport = Date.now();
@@ -745,7 +745,7 @@
     const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const lines = [cols.map(c => cell(c[1])).join(',')].concat(positions.map(p =>
       cols.map(([k]) => cell(k === 'status' ? STATUS[p.status]?.label : k === 'method' ? METHOD_LABEL[p.method] : p[k])).join(',')));
-    download(`careerly-${todayISO()}.csv`, '﻿' + lines.join('\r\n'), 'text/csv');
+    download(`scholarly-${todayISO()}.csv`, '﻿' + lines.join('\r\n'), 'text/csv');
     menu.hidden = true;
   });
 

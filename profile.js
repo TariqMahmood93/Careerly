@@ -1,4 +1,4 @@
-/* Careerly: "My profile & CV" dialog.
+/* Scholarly: "My profile & CV" dialog.
  * Lets you upload your CV (PDF or text) and edit the search profile. Both are saved in this
  * site's repository as data/cv.md and data/profile.md, and the daily search reads them.
  * Anyone can view them; saving needs a fine-grained GitHub token, stored only in this browser.
@@ -10,7 +10,7 @@
   const BRANCH = 'main';
   const PROFILE_PATH = 'data/profile.md';
   const CV_PATH = 'data/cv.md';
-  const CV_HEADER = '# CV (uploaded from the Careerly app)\n\n';
+  const CV_HEADER = '# CV (uploaded from the Scholarly app)\n\n';
 
   // This site's own repository (owner.github.io/<repo>), with a fallback for local use
   const REPO = (() => {
@@ -18,7 +18,7 @@
     const first = location.pathname.split('/').filter(Boolean)[0];
     return h.endsWith('.github.io') && first
       ? { owner: h.split('.')[0], repo: first }
-      : { owner: 'TariqMahmood93', repo: 'Careerly' };
+      : { owner: 'TariqMahmood93', repo: 'Scholarly' };
   })();
 
   const $ = sel => document.querySelector(sel);
@@ -271,8 +271,8 @@
     let cv = $('#cv-text').value.trim();
     if ($('#cv-redact').checked) cv = redact(cv);
     const changes = [];
-    if (profile.trim() !== original.profile.trim()) changes.push([PROFILE_PATH, profile, 'Update search profile from the Careerly app']);
-    if (cv !== original.cv) changes.push([CV_PATH, cv ? CV_HEADER + cv + '\n' : '', 'Update CV from the Careerly app']);
+    if (profile.trim() !== original.profile.trim()) changes.push([PROFILE_PATH, profile, 'Update search profile from the Scholarly app']);
+    if (cv !== original.cv) changes.push([CV_PATH, cv ? CV_HEADER + cv + '\n' : '', 'Update CV from the Scholarly app']);
     if (!changes.length) { setStatus('Nothing changed.'); return; }
 
     const btn = $('#btn-profile-save');

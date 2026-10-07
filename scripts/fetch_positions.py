@@ -26,7 +26,7 @@ import urllib.request
 from zoneinfo import ZoneInfo
 
 UA = ('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) '
-      'Chrome/126 Safari/537.36 Careerly/1.0 (personal job tracker)')
+      'Chrome/126 Safari/537.36 Scholarly/1.0 (personal job tracker)')
 TODAY = dt.date.today()
 DELAY = 0.4  # seconds between requests, to be polite
 
