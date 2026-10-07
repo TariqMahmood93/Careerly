@@ -254,9 +254,14 @@
     return tracked.ids.has(p.id) || tracked.urls.has(p.url) || (p.pick && p.raw && tracked.urls.has(p.raw.callUrl));
   }
 
-  function filtered(tracked) {
+  // calls still to decide on: not tracked and not deleted
+  function openCalls(tracked, hidden) {
+    return all.filter(p => !isTracked(p, tracked) && !hidden.has(p.id));
+  }
+
+  function filtered(tracked, hidden) {
     const q = ($('#br-search').value || '').trim().toLowerCase();
-    const open = all.filter(p => !isTracked(p, tracked));
+    const open = openCalls(tracked, hidden);
     let list = prefs.relevant ? open.filter(relOf) : open;
     if (q) {
       const terms = q.split(/\s+/);
@@ -293,15 +298,18 @@
 
   function render() {
     const tracked = C.tracked();
-    const list = filtered(tracked);
+    const hidden = C.hiddenCalls();
+    const list = filtered(tracked, hidden);
     const today = todayISO();
-    const open = all.filter(p => !isTracked(p, tracked));
-    const trackedCount = all.length - open.length;
+    const open = openCalls(tracked, hidden);
+    const trackedCount = all.filter(p => isTracked(p, tracked)).length;
+    const deletedIds = all.filter(p => hidden.has(p.id) && !isTracked(p, tracked)).map(p => p.id);
     const relevantCount = open.filter(relOf).length;
     const newToday = list.filter(p => p.firstSeen === today).length;
     $('#br-summary').innerHTML =
       `<strong>${list.length}</strong> shown · ${open.length} open calls in total, ${relevantCount} match ${isPersonal() ? 'your CV' : 'the profile'}` +
       (trackedCount ? ` · ${trackedCount} already in your tracked positions` : '') +
+      (deletedIds.length ? ` · ${deletedIds.length} deleted <button type="button" class="linkish" id="br-restore">restore</button>` : '') +
       (newToday ? ` · <strong>${newToday} new today</strong>` : '') +
       (meta.updatedAt ? ` · updated ${esc(new Date(meta.updatedAt).toLocaleString())}` : '') +
       (meta.picksUpdatedAt ? ` · Claude's last search ${esc(new Date(meta.picksUpdatedAt).toLocaleString())}` : '');
@@ -337,6 +345,7 @@
         </div>
         <div class="br-actions">
           <button class="btn small primary" data-add="${esc(p.id)}">+ Track</button>
+          <button class="btn small danger" data-hide="${esc(p.id)}" title="Remove this call from the list">🗑 Delete</button>
         </div>
       </article>`;
     }).join('') || '<p class="empty">No open positions match these filters.</p>';
@@ -383,6 +392,18 @@
   $('#br-list').addEventListener('click', e => {
     const btn = e.target.closest('[data-add]');
     if (btn && !btn.disabled) add(btn.dataset.add, btn);
+    const del = e.target.closest('[data-hide]');
+    if (del) {
+      const id = del.dataset.hide;
+      C.hideCall(id);
+      C.toast('Position deleted from the list.', { label: 'Undo', run: () => C.unhideCalls([id]) });
+    }
+  });
+  $('#br-summary').addEventListener('click', e => {
+    if (!e.target.closest('#br-restore')) return;
+    const hidden = C.hiddenCalls();
+    const ids = all.filter(p => hidden.has(p.id)).map(p => p.id);
+    if (ids.length && confirm(`Restore ${ids.length} deleted position${ids.length > 1 ? 's' : ''} to the list?`)) C.unhideCalls(ids);
   });
   $('#br-toggle').addEventListener('click', () => {
     const body = $('#br-body');

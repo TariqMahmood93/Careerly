@@ -147,7 +147,8 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; }
 .br-item details { font-size: 13px; }
 .br-item details p { margin: 4px 0; }
 .br-item summary { cursor: pointer; color: var(--primary); }
-.br-actions { flex-shrink: 0; font-size: 13px; }
+.br-actions { flex-shrink: 0; font-size: 13px; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.linkish { background: none; border: 0; padding: 0; color: var(--primary); text-decoration: underline; cursor: pointer; font: inherit; }
 .chip.kw { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); }
 #br-more { margin: 10px auto 0; display: block; }
 #br-more[hidden] { display: none; }

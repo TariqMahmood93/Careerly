@@ -401,6 +401,19 @@
       ids: new Set(positions.map(p => p.sourceId).filter(Boolean)),
       urls: new Set(positions.map(p => p.callUrl).filter(Boolean)),
     }),
+    // open calls the user deleted from "All open positions". Kept in the synced deletion log as
+    // 'call:<id>' (time deleted) and 'unhide:<id>' (time restored); the later of the two wins.
+    hiddenCalls: () => {
+      const out = new Set();
+      for (const [k, t] of Object.entries(deleted)) {
+        if (!k.startsWith('call:')) continue;
+        const id = k.slice(5);
+        if (t > (deleted['unhide:' + id] || 0)) out.add(id);
+      }
+      return out;
+    },
+    hideCall: id => { deleted['call:' + id] = Date.now(); persist(); render(); },
+    unhideCalls: ids => { const now = Date.now(); ids.forEach(id => { deleted['unhide:' + id] = now; }); persist(); render(); },
     onChange: fn => listeners.push(fn),
     // used by cloud.js to sync the tracker with the signed-in account
     getState: () => ({ positions, deleted }),
