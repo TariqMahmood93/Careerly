@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-07T09:40:17+02:00",
+  "updatedAt": "2026-10-08T09:40:38+02:00",
   "suggestions": [
     {
       "id": "tud-scads-postdoc-llm-nlp-kg-graphml-2026",
@@ -755,6 +755,74 @@
       "source": "AcademicPositions",
       "matchScore": 3,
       "why": "Data-centric ML infrastructure (datasets, metadata, benchmarks) touches your data-quality interests, but the role is partly engineering."
+    },
+    {
+      "id": "ethz-sml-postdoc-trustworthy-ml-2026",
+      "foundOn": "2026-10-08",
+      "title": "Postdoctoral Researcher in Trustworthy Machine Learning",
+      "type": "Postdoc",
+      "institution": "ETH Zurich – Institute of Machine Learning, SML group",
+      "group": "",
+      "pi": "",
+      "country": "Switzerland",
+      "city": "Zurich",
+      "callUrl": "https://jobs.ethz.ch/job/view/11067",
+      "reference": "",
+      "deadline": "",
+      "deadlineTime": "",
+      "deadlineTz": "",
+      "startDate": "Immediately",
+      "duration": "1 year, renewable up to 3 years",
+      "salary": "",
+      "method": "portal",
+      "applyEmail": "",
+      "applyUrl": "https://jobs.ethz.ch/job/view/11067",
+      "emailSubject": "",
+      "procedure": "Two profiles: mathematical foundations (distributional generalization, causality, RL theory, privacy) or real-world impact, which explicitly includes LLM adaptive evaluation and post-training backed by clean mathematical proofs. Freedom to choose problems; co-mentoring of Bachelor's/Master's theses. No deadline found; apply through the ETH online portal (ETH asks for portal applications, not email).",
+      "documents": [
+        "CV",
+        "Cover letter",
+        "Research statement / proposal",
+        "Reference contacts"
+      ],
+      "keywords": "trustworthy ML, LLM evaluation, post-training, privacy, distribution shift, theory",
+      "source": "ETH Zurich jobs",
+      "matchScore": 3,
+      "why": "Trustworthy ML with LLM evaluation fits your trustworthy-AI and LLM work, but the group is theory-oriented, so you would need to emphasise any formal/mathematical results."
+    },
+    {
+      "id": "univaq-rtt-info01-iinf04-disim-2026",
+      "foundOn": "2026-10-08",
+      "title": "Ricercatori in tenure track (RTT, 6 anni) – 2 posti, SSD INFO-01/A e IINF-04/A, DISIM",
+      "type": "Researcher / Research Scientist",
+      "institution": "Università degli Studi dell'Aquila – DISIM",
+      "group": "",
+      "pi": "",
+      "country": "Italy",
+      "city": "L'Aquila",
+      "callUrl": "https://bandi.mur.gov.it/jobs.php/public/job/id_job/152323",
+      "reference": "",
+      "deadline": "2026-10-15",
+      "deadlineTime": "23:59",
+      "deadlineTz": "Europe/Rome",
+      "startDate": "",
+      "duration": "6 years (tenure track, art. 24 c.3 L. 240/2010)",
+      "salary": "",
+      "method": "portal",
+      "applyEmail": "",
+      "applyUrl": "https://www.univaq.it/section.php?id=1532",
+      "emailSubject": "",
+      "procedure": "Selection for 2 tenure-track researchers (RTT) at DISIM, one in INFO-01/A (Informatica) and one in IINF-04/A (Automatica). Apply via the university's call page (usually through PICA); check the call for the INFO-01/A research profile, required documents, publication limits and language test.",
+      "documents": [
+        "CV",
+        "Publication list",
+        "Selected publications (PDF)",
+        "ID / passport copy"
+      ],
+      "keywords": "tenure track, INFO-01/A, computer science",
+      "source": "Bandi MUR",
+      "matchScore": 3,
+      "why": "A 6-year tenure-track post in Informatica (INFO-01/A) in Italy, a step up from a postdoc. Check that the INFO-01/A research profile matches data management/ML."
     }
   ]
 }
